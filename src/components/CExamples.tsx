@@ -140,22 +140,22 @@ export const CExamples = ({ onSelectExample }: CExamplesProps) => {
           <CheckCircle2 className="w-5 h-5 text-success" />
           <h3 className="font-semibold text-success">Valid C Programs</h3>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {validExamples.map((example, index) => (
             <Button
               key={index}
               onClick={() => onSelectExample(example.code)}
               variant="outline"
-              className="h-auto flex-col items-start gap-2 p-4 hover:bg-success/20 border-success/30"
+              className="h-auto min-h-[180px] flex flex-col items-start gap-3 p-4 hover:bg-success/20 border-success/30"
             >
-              <div className="flex items-center gap-2 w-full">
-                <Code2 className="w-4 h-4 text-success" />
-                <span className="font-medium text-sm">{example.title}</span>
+              <div className="flex items-center gap-2 w-full flex-shrink-0">
+                <Code2 className="w-4 h-4 text-success flex-shrink-0" />
+                <span className="font-medium text-sm leading-tight">{example.title}</span>
               </div>
-              <code className="text-xs font-mono text-left w-full bg-code-bg p-2 rounded whitespace-pre-wrap">
+              <code className="text-xs font-mono text-left w-full bg-code-bg p-3 rounded whitespace-pre-wrap flex-grow overflow-auto max-h-[100px]">
                 {example.code}
               </code>
-              <p className="text-xs text-muted-foreground text-left w-full">
+              <p className="text-xs text-muted-foreground text-left w-full leading-relaxed flex-shrink-0">
                 {example.description}
               </p>
             </Button>
@@ -168,22 +168,22 @@ export const CExamples = ({ onSelectExample }: CExamplesProps) => {
           <XCircle className="w-5 h-5 text-error" />
           <h3 className="font-semibold text-error">Invalid C Programs (With Errors)</h3>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {invalidExamples.map((example, index) => (
             <Button
               key={index}
               onClick={() => onSelectExample(example.code)}
               variant="outline"
-              className="h-auto flex-col items-start gap-2 p-4 hover:bg-error/20 border-error/30"
+              className="h-auto min-h-[180px] flex flex-col items-start gap-3 p-4 hover:bg-error/20 border-error/30"
             >
-              <div className="flex items-center gap-2 w-full">
-                <XCircle className="w-4 h-4 text-error" />
-                <span className="font-medium text-sm">{example.title}</span>
+              <div className="flex items-center gap-2 w-full flex-shrink-0">
+                <XCircle className="w-4 h-4 text-error flex-shrink-0" />
+                <span className="font-medium text-sm leading-tight">{example.title}</span>
               </div>
-              <code className="text-xs font-mono text-left w-full bg-code-bg p-2 rounded whitespace-pre-wrap">
+              <code className="text-xs font-mono text-left w-full bg-code-bg p-3 rounded whitespace-pre-wrap flex-grow overflow-auto max-h-[100px]">
                 {example.code}
               </code>
-              <p className="text-xs text-error text-left w-full">
+              <p className="text-xs text-error text-left w-full leading-relaxed flex-shrink-0">
                 ⚠️ {example.error}
               </p>
             </Button>
