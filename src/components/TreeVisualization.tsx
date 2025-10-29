@@ -26,7 +26,7 @@ const TreeNode = ({ node, depth = 0 }: { node: ASTNode; depth?: number }) => {
           `}
         >
           {isLeaf ? (
-            <span>{node.value}</span>
+            <span>{typeof node.value === 'number' || typeof node.value === 'string' ? node.value : 'value'}</span>
           ) : (
             <span className="font-bold">{node.operator}</span>
           )}

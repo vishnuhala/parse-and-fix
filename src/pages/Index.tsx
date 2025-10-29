@@ -3,6 +3,7 @@ import { parseExpression, ParseResult, evaluateAST, Token, Lexer } from "@/lib/p
 import { ParserInput } from "@/components/ParserInput";
 import { ParseOutput } from "@/components/ParseOutput";
 import { ExampleExpressions } from "@/components/ExampleExpressions";
+import { CExamples } from "@/components/CExamples";
 import { TokenVisualization } from "@/components/TokenVisualization";
 import { GrammarRules } from "@/components/GrammarRules";
 import { TreeVisualization } from "@/components/TreeVisualization";
@@ -85,10 +86,10 @@ const Index = () => {
             Mini Parser with Error Suggestions
           </h1>
           <p className="text-muted-foreground text-lg mb-2">
-            Advanced arithmetic expression parser with intelligent error recovery
+            Comprehensive C & Arithmetic Expression Parser with Error Recovery
           </p>
           <p className="text-sm text-muted-foreground">
-            Lexical Analysis • Syntax Analysis • Error Detection • AST Evaluation
+            Lexical Analysis • Syntax Analysis • Semantic Evaluation • Error Detection & Recovery
           </p>
         </div>
 
@@ -133,7 +134,22 @@ const Index = () => {
           </Card>
 
           <div className="grid md:grid-cols-2 gap-6">
-            <ExampleExpressions onSelect={handleExampleSelect} />
+            <Card className="p-6 bg-card/50 backdrop-blur-sm">
+              <Tabs defaultValue="c-examples" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 mb-4">
+                  <TabsTrigger value="c-examples">C Programs</TabsTrigger>
+                  <TabsTrigger value="arithmetic">Arithmetic</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="c-examples">
+                  <CExamples onSelectExample={handleExampleSelect} />
+                </TabsContent>
+                
+                <TabsContent value="arithmetic">
+                  <ExampleExpressions onSelect={handleExampleSelect} />
+                </TabsContent>
+              </Tabs>
+            </Card>
             <GrammarRules />
           </div>
 

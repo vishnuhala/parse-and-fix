@@ -13,7 +13,16 @@ const tokenColors: Record<string, string> = {
   LPAREN: "bg-primary/20 text-primary border-primary/30",
   RPAREN: "bg-primary/20 text-primary border-primary/30",
   INVALID: "bg-error/20 text-error border-error/30",
-  EOF: "bg-muted text-muted-foreground border-border"
+  EOF: "bg-muted text-muted-foreground border-border",
+  KEYWORD: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+  IDENTIFIER: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+  SEMICOLON: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+  LBRACE: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+  RBRACE: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+  COMMA: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+  ASSIGN: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+  COMPARISON: "bg-pink-500/20 text-pink-400 border-pink-500/30",
+  LOGICAL: "bg-red-500/20 text-red-400 border-red-500/30"
 };
 
 export const TokenVisualization = ({ tokens }: TokenVisualizationProps) => {
