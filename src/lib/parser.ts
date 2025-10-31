@@ -13,7 +13,18 @@ export type TokenType =
   | 'COMMA'
   | 'ASSIGN'
   | 'COMPARISON'
-  | 'LOGICAL';
+  | 'LOGICAL'
+  | 'INCREMENT'
+  | 'DECREMENT'
+  | 'COMPOUND_ASSIGN'
+  | 'LBRACKET'
+  | 'RBRACKET'
+  | 'STRING'
+  | 'CHAR'
+  | 'PREPROCESSOR'
+  | 'DOT'
+  | 'ARROW'
+  | 'AMPERSAND';
 
 export interface Token {
   type: TokenType;
@@ -34,7 +45,7 @@ export interface ParseResult {
 }
 
 export interface ASTNode {
-  type: 'number' | 'binary_op' | 'declaration' | 'assignment' | 'identifier' | 'if_statement' | 'while_loop' | 'for_loop' | 'function' | 'block' | 'return' | 'program';
+  type: string;
   value?: number | string | ASTNode;
   operator?: string;
   left?: ASTNode;
@@ -46,9 +57,17 @@ export interface ASTNode {
   body?: ASTNode | ASTNode[];
   increment?: ASTNode;
   elseBranch?: ASTNode;
-  parameters?: ASTNode[];
+  parameters?: { type: string; name: string }[];
   returnType?: string;
   statements?: ASTNode[];
+  size?: ASTNode;
+  isArray?: boolean;
+  isPointer?: boolean;
+  arguments?: ASTNode[];
+  test?: ASTNode;
+  cases?: { value: ASTNode; body: ASTNode[] }[];
+  default?: ASTNode[];
+  directive?: string;
 }
 
 export class Lexer {
@@ -57,7 +76,9 @@ export class Lexer {
   private keywords = new Set([
     'int', 'float', 'char', 'void', 'if', 'else', 'while', 'for', 
     'return', 'break', 'continue', 'struct', 'const', 'do', 'switch',
-    'case', 'default', 'double', 'long', 'short', 'unsigned', 'signed'
+    'case', 'default', 'double', 'long', 'short', 'unsigned', 'signed',
+    'sizeof', 'static', 'extern', 'auto', 'register', 'enum', 'union',
+    'typedef', 'volatile', 'goto'
   ]);
 
   constructor(input: string) {
@@ -71,6 +92,30 @@ export class Lexer {
       // Skip whitespace
       if (/\s/.test(this.input[this.position])) {
         this.position++;
+        continue;
+      }
+
+      // Preprocessor directives
+      if (this.input[this.position] === '#') {
+        const start = this.position;
+        let directive = '';
+        while (this.position < this.input.length && this.input[this.position] !== '\n') {
+          directive += this.input[this.position];
+          this.position++;
+        }
+        tokens.push({ type: 'PREPROCESSOR', value: directive, position: start });
+        continue;
+      }
+
+      // String literals
+      if (this.input[this.position] === '"') {
+        tokens.push(this.readString());
+        continue;
+      }
+
+      // Character literals
+      if (this.input[this.position] === "'") {
+        tokens.push(this.readChar());
         continue;
       }
 
@@ -106,6 +151,52 @@ export class Lexer {
       // Identifiers and keywords
       if (/[a-zA-Z_]/.test(char)) {
         tokens.push(this.readIdentifier());
+        continue;
+      }
+
+      // Increment/Decrement
+      if (char === '+' && this.input[this.position + 1] === '+') {
+        tokens.push({ type: 'INCREMENT', value: '++', position: this.position });
+        this.position += 2;
+        continue;
+      }
+      if (char === '-' && this.input[this.position + 1] === '-') {
+        tokens.push({ type: 'DECREMENT', value: '--', position: this.position });
+        this.position += 2;
+        continue;
+      }
+
+      // Compound assignments
+      if (char === '+' && this.input[this.position + 1] === '=') {
+        tokens.push({ type: 'COMPOUND_ASSIGN', value: '+=', position: this.position });
+        this.position += 2;
+        continue;
+      }
+      if (char === '-' && this.input[this.position + 1] === '=') {
+        tokens.push({ type: 'COMPOUND_ASSIGN', value: '-=', position: this.position });
+        this.position += 2;
+        continue;
+      }
+      if (char === '*' && this.input[this.position + 1] === '=') {
+        tokens.push({ type: 'COMPOUND_ASSIGN', value: '*=', position: this.position });
+        this.position += 2;
+        continue;
+      }
+      if (char === '/' && this.input[this.position + 1] === '=') {
+        tokens.push({ type: 'COMPOUND_ASSIGN', value: '/=', position: this.position });
+        this.position += 2;
+        continue;
+      }
+      if (char === '%' && this.input[this.position + 1] === '=') {
+        tokens.push({ type: 'COMPOUND_ASSIGN', value: '%=', position: this.position });
+        this.position += 2;
+        continue;
+      }
+
+      // Arrow operator
+      if (char === '-' && this.input[this.position + 1] === '>') {
+        tokens.push({ type: 'ARROW', value: '->', position: this.position });
+        this.position += 2;
         continue;
       }
 
@@ -162,6 +253,13 @@ export class Lexer {
         this.position++;
         continue;
       }
+
+      // Address-of operator
+      if (char === '&') {
+        tokens.push({ type: 'AMPERSAND', value: '&', position: this.position });
+        this.position++;
+        continue;
+      }
       
       // Arithmetic operators
       if (['+', '-', '*', '/', '%', '^'].includes(char)) {
@@ -178,6 +276,16 @@ export class Lexer {
       }
       if (char === ')') {
         tokens.push({ type: 'RPAREN', value: char, position: this.position });
+        this.position++;
+        continue;
+      }
+      if (char === '[') {
+        tokens.push({ type: 'LBRACKET', value: char, position: this.position });
+        this.position++;
+        continue;
+      }
+      if (char === ']') {
+        tokens.push({ type: 'RBRACKET', value: char, position: this.position });
         this.position++;
         continue;
       }
@@ -198,6 +306,11 @@ export class Lexer {
       }
       if (char === ',') {
         tokens.push({ type: 'COMMA', value: char, position: this.position });
+        this.position++;
+        continue;
+      }
+      if (char === '.') {
+        tokens.push({ type: 'DOT', value: char, position: this.position });
         this.position++;
         continue;
       }
@@ -250,6 +363,47 @@ export class Lexer {
       position: start
     };
   }
+
+  private readString(): Token {
+    const start = this.position;
+    let str = '"';
+    this.position++; // skip opening "
+    
+    while (this.position < this.input.length && this.input[this.position] !== '"') {
+      if (this.input[this.position] === '\\' && this.position + 1 < this.input.length) {
+        str += this.input[this.position] + this.input[this.position + 1];
+        this.position += 2;
+      } else {
+        str += this.input[this.position];
+        this.position++;
+      }
+    }
+    
+    if (this.position < this.input.length && this.input[this.position] === '"') {
+      str += '"';
+      this.position++;
+    }
+    
+    return { type: 'STRING', value: str, position: start };
+  }
+
+  private readChar(): Token {
+    const start = this.position;
+    let ch = "'";
+    this.position++; // skip opening '
+    
+    while (this.position < this.input.length && this.input[this.position] !== "'") {
+      ch += this.input[this.position];
+      this.position++;
+    }
+    
+    if (this.position < this.input.length && this.input[this.position] === "'") {
+      ch += "'";
+      this.position++;
+    }
+    
+    return { type: 'CHAR', value: ch, position: start };
+  }
 }
 
 class Parser {
@@ -274,10 +428,11 @@ class Parser {
         return { success: false, errors: this.errors };
       }
 
-      // Check if this looks like C code (has keywords, semicolons, or braces)
+      // Check if this looks like C code
       const hasCFeatures = this.tokens.some(t => 
         t.type === 'KEYWORD' || t.type === 'SEMICOLON' || 
-        t.type === 'LBRACE' || t.type === 'RBRACE' || t.type === 'IDENTIFIER'
+        t.type === 'LBRACE' || t.type === 'RBRACE' || 
+        t.type === 'PREPROCESSOR'
       );
 
       let tree: ASTNode;
@@ -311,6 +466,16 @@ class Parser {
     const statements: ASTNode[] = [];
     
     while (this.currentToken().type !== 'EOF') {
+      // Handle preprocessor directives
+      if (this.currentToken().type === 'PREPROCESSOR') {
+        statements.push({
+          type: 'preprocessor',
+          directive: this.currentToken().value
+        });
+        this.advance();
+        continue;
+      }
+      
       statements.push(this.statement());
     }
     
@@ -324,7 +489,7 @@ class Parser {
     const token = this.currentToken();
     
     // Declaration
-    if (token.type === 'KEYWORD' && ['int', 'float', 'char', 'void', 'double'].includes(token.value)) {
+    if (token.type === 'KEYWORD' && ['int', 'float', 'char', 'void', 'double', 'long', 'short', 'unsigned', 'signed'].includes(token.value)) {
       return this.declaration();
     }
     
@@ -337,6 +502,26 @@ class Parser {
     }
     if (token.type === 'KEYWORD' && token.value === 'for') {
       return this.forLoop();
+    }
+    if (token.type === 'KEYWORD' && token.value === 'do') {
+      return this.doWhileLoop();
+    }
+    if (token.type === 'KEYWORD' && token.value === 'switch') {
+      return this.switchStatement();
+    }
+    if (token.type === 'KEYWORD' && token.value === 'break') {
+      this.advance();
+      if (this.currentToken().type === 'SEMICOLON') {
+        this.advance();
+      }
+      return { type: 'break' };
+    }
+    if (token.type === 'KEYWORD' && token.value === 'continue') {
+      this.advance();
+      if (this.currentToken().type === 'SEMICOLON') {
+        this.advance();
+      }
+      return { type: 'continue' };
     }
     if (token.type === 'KEYWORD' && token.value === 'return') {
       return this.returnStatement();
@@ -361,7 +546,14 @@ class Parser {
   }
 
   private declaration(): ASTNode {
-    const dataType = this.advance().value; // int, float, char, etc.
+    const dataType = this.advance().value;
+    
+    // Handle pointer declarations
+    let isPointer = false;
+    while (this.currentToken().type === 'OPERATOR' && this.currentToken().value === '*') {
+      isPointer = true;
+      this.advance();
+    }
     
     if (this.currentToken().type !== 'IDENTIFIER') {
       this.errors.push({
@@ -373,14 +565,61 @@ class Parser {
     }
     
     const identifier = this.advance().value;
-    let init: ASTNode | undefined;
+    
+    // Array declaration
+    if (this.currentToken().type === 'LBRACKET') {
+      this.advance();
+      let size: ASTNode | undefined;
+      
+      if (this.currentToken().type === 'NUMBER') {
+        size = { type: 'number', value: parseFloat(this.currentToken().value) };
+        this.advance();
+      }
+      
+      if (this.currentToken().type !== 'RBRACKET') {
+        this.errors.push({
+          message: 'Expected ] after array size',
+          position: this.currentToken().position,
+          suggestion: 'Add ] to close array declaration'
+        });
+        throw new Error('Missing ]');
+      }
+      this.advance();
+      
+      let init: ASTNode | undefined;
+      if (this.currentToken().type === 'ASSIGN') {
+        this.advance();
+        init = this.expression();
+      }
+      
+      if (this.currentToken().type !== 'SEMICOLON') {
+        this.errors.push({
+          message: 'Missing semicolon',
+          position: this.currentToken().position,
+          suggestion: 'Add ; after array declaration'
+        });
+        throw new Error('Missing semicolon');
+      }
+      this.advance();
+      
+      return {
+        type: 'declaration',
+        dataType,
+        identifier,
+        isArray: true,
+        size,
+        init,
+        isPointer
+      };
+    }
     
     // Check for function declaration
     if (this.currentToken().type === 'LPAREN') {
-      return this.functionDeclaration(dataType, identifier);
+      return this.functionDeclaration(dataType, identifier, isPointer);
     }
     
     // Variable initialization
+    let init: ASTNode | undefined;
     if (this.currentToken().type === 'ASSIGN') {
       this.advance();
       init = this.expression();
@@ -400,25 +639,32 @@ class Parser {
       type: 'declaration',
       dataType,
       identifier,
-      init
+      init,
+      isPointer
     };
   }
 
-  private functionDeclaration(returnType: string, name: string): ASTNode {
+  private functionDeclaration(returnType: string, name: string, isPointer: boolean): ASTNode {
     this.advance(); // consume (
     
-    const parameters: ASTNode[] = [];
+    const parameters: { type: string; name: string }[] = [];
     if (this.currentToken().type !== 'RPAREN') {
       // Parse parameters
       while (true) {
         if (this.currentToken().type === 'KEYWORD') {
           const paramType = this.advance().value;
+          let paramPointer = false;
+          
+          if (this.currentToken().type === 'OPERATOR' && this.currentToken().value === '*') {
+            paramPointer = true;
+            this.advance();
+          }
+          
           if (this.currentToken().type === 'IDENTIFIER') {
             const paramName = this.advance().value;
             parameters.push({
-              type: 'declaration',
-              dataType: paramType,
-              identifier: paramName
+              type: paramPointer ? paramType + '*' : paramType,
+              name: paramName
             });
           }
         }
@@ -445,7 +691,7 @@ class Parser {
     
     return {
       type: 'function',
-      returnType,
+      returnType: isPointer ? returnType + '*' : returnType,
       identifier: name,
       parameters,
       body
@@ -559,6 +805,157 @@ class Parser {
     };
   }
 
+  private doWhileLoop(): ASTNode {
+    this.advance(); // consume 'do'
+    
+    const body = this.currentToken().type === 'LBRACE' ? this.block() : this.statement();
+    
+    if (this.currentToken().type !== 'KEYWORD' || this.currentToken().value !== 'while') {
+      this.errors.push({
+        message: "Expected 'while' after do body",
+        position: this.currentToken().position,
+        suggestion: "Add 'while (condition)' after do block"
+      });
+      throw new Error("Expected 'while'");
+    }
+    this.advance();
+    
+    if (this.currentToken().type !== 'LPAREN') {
+      this.errors.push({
+        message: 'Expected ( after while',
+        position: this.currentToken().position,
+        suggestion: 'Add ( before condition'
+      });
+      throw new Error('Expected (');
+    }
+    this.advance();
+    
+    const condition = this.expression();
+    
+    if (this.currentToken().type !== 'RPAREN') {
+      this.errors.push({
+        message: 'Expected ) after condition',
+        position: this.currentToken().position,
+        suggestion: 'Add ) after condition'
+      });
+      throw new Error('Expected )');
+    }
+    this.advance();
+    
+    if (this.currentToken().type === 'SEMICOLON') {
+      this.advance();
+    }
+    
+    return {
+      type: 'do_while',
+      condition,
+      body
+    };
+  }
+
+  private switchStatement(): ASTNode {
+    this.advance(); // consume 'switch'
+    
+    if (this.currentToken().type !== 'LPAREN') {
+      this.errors.push({
+        message: 'Expected ( after switch',
+        position: this.currentToken().position,
+        suggestion: 'Add ( before expression'
+      });
+      throw new Error('Expected (');
+    }
+    this.advance();
+    
+    const test = this.expression();
+    
+    if (this.currentToken().type !== 'RPAREN') {
+      this.errors.push({
+        message: 'Expected ) after switch expression',
+        position: this.currentToken().position,
+        suggestion: 'Add ) after expression'
+      });
+      throw new Error('Expected )');
+    }
+    this.advance();
+    
+    if (this.currentToken().type !== 'LBRACE') {
+      this.errors.push({
+        message: 'Expected { after switch',
+        position: this.currentToken().position,
+        suggestion: 'Add { to start switch body'
+      });
+      throw new Error('Expected {');
+    }
+    this.advance();
+    
+    const cases: { value: ASTNode; body: ASTNode[] }[] = [];
+    let defaultCase: ASTNode[] | undefined;
+    
+    while (this.currentToken().type !== 'RBRACE' && this.currentToken().type !== 'EOF') {
+      if (this.currentToken().type === 'KEYWORD') {
+        if (this.currentToken().value === 'case') {
+          this.advance();
+          const value = this.expression();
+          
+          if (this.currentToken().type !== 'SEMICOLON') {
+            this.errors.push({
+              message: 'Expected : after case value',
+              position: this.currentToken().position,
+              suggestion: 'Add : after case value'
+            });
+          } else {
+            this.advance();
+          }
+          
+          const body: ASTNode[] = [];
+          while (this.currentToken().type !== 'KEYWORD' && 
+                 this.currentToken().type !== 'RBRACE' && 
+                 this.currentToken().type !== 'EOF') {
+            body.push(this.statement());
+          }
+          
+          cases.push({ value, body });
+        } else if (this.currentToken().value === 'default') {
+          this.advance();
+          
+          if (this.currentToken().type === 'SEMICOLON') {
+            this.advance();
+          }
+          
+          const body: ASTNode[] = [];
+          while (this.currentToken().type !== 'KEYWORD' && 
+                 this.currentToken().type !== 'RBRACE' && 
+                 this.currentToken().type !== 'EOF') {
+            body.push(this.statement());
+          }
+          
+          defaultCase = body;
+        } else {
+          break;
+        }
+      } else {
+        break;
+      }
+    }
+    
+    if (this.currentToken().type !== 'RBRACE') {
+      this.errors.push({
+        message: 'Expected } to close switch',
+        position: this.currentToken().position,
+        suggestion: 'Add } to close switch statement'
+      });
+      throw new Error('Expected }');
+    }
+    this.advance();
+    
+    return {
+      type: 'switch',
+      test,
+      cases,
+      default: defaultCase
+    };
+  }
+
   private forLoop(): ASTNode {
     this.advance(); // consume 'for'
     
@@ -629,8 +1026,90 @@ class Parser {
   private assignmentOrExpression(): ASTNode {
     const identifier = this.advance().value;
     
-    if (this.currentToken().type === 'ASSIGN') {
+    // Array subscript
+    if (this.currentToken().type === 'LBRACKET') {
       this.advance();
+      const index = this.expression();
+      
+      if (this.currentToken().type !== 'RBRACKET') {
+        this.errors.push({
+          message: 'Expected ] after array index',
+          position: this.currentToken().position,
+          suggestion: 'Add ] to close array subscript'
+        });
+        throw new Error('Missing ]');
+      }
+      this.advance();
+      
+      if (this.currentToken().type === 'ASSIGN' || this.currentToken().type === 'COMPOUND_ASSIGN') {
+        const op = this.advance().value;
+        const value = this.expression();
+        
+        if (this.currentToken().type === 'SEMICOLON') {
+          this.advance();
+        }
+        
+        return {
+          type: 'assignment',
+          identifier,
+          value,
+          operator: op,
+          left: { type: 'array_access', identifier, value: index }
+        };
+      }
+    }
+    
+    // Function call
+    if (this.currentToken().type === 'LPAREN') {
+      this.advance();
+      const args: ASTNode[] = [];
+      
+      while (this.currentToken().type !== 'RPAREN' && this.currentToken().type !== 'EOF') {
+        args.push(this.expression());
+        if (this.currentToken().type === 'COMMA') {
+          this.advance();
+        }
+      }
+      
+      if (this.currentToken().type !== 'RPAREN') {
+        this.errors.push({
+          message: 'Expected ) after function arguments',
+          position: this.currentToken().position,
+          suggestion: 'Add ) to close function call'
+        });
+        throw new Error('Missing )');
+      }
+      this.advance();
+      
+      if (this.currentToken().type === 'SEMICOLON') {
+        this.advance();
+      }
+      
+      return {
+        type: 'function_call',
+        identifier,
+        arguments: args
+      };
+    }
+    
+    // Increment/Decrement
+    if (this.currentToken().type === 'INCREMENT' || this.currentToken().type === 'DECREMENT') {
+      const op = this.advance().value;
+      
+      if (this.currentToken().type === 'SEMICOLON') {
+        this.advance();
+      }
+      
+      return {
+        type: 'postfix',
+        operator: op,
+        identifier
+      };
+    }
+    
+    // Assignment or compound assignment
+    if (this.currentToken().type === 'ASSIGN' || this.currentToken().type === 'COMPOUND_ASSIGN') {
+      const op = this.advance().value;
       const value = this.expression();
       
       if (this.currentToken().type === 'SEMICOLON') {
@@ -640,7 +1119,8 @@ class Parser {
       return {
         type: 'assignment',
         identifier,
-        value
+        value,
+        operator: op
       };
     }
     
@@ -736,11 +1216,110 @@ class Parser {
       };
     }
 
-    if (token.type === 'IDENTIFIER') {
+    if (token.type === 'STRING') {
       this.advance();
       return {
-        type: 'identifier',
+        type: 'string',
         value: token.value
+      };
+    }
+
+    if (token.type === 'CHAR') {
+      this.advance();
+      return {
+        type: 'char',
+        value: token.value
+      };
+    }
+
+    // Prefix increment/decrement
+    if (token.type === 'INCREMENT' || token.type === 'DECREMENT') {
+      const op = this.advance().value;
+      if (this.currentToken().type === 'IDENTIFIER') {
+        const id = this.advance().value;
+        return {
+          type: 'prefix',
+          operator: op,
+          identifier: id
+        };
+      }
+    }
+
+    // Address-of operator
+    if (token.type === 'AMPERSAND') {
+      this.advance();
+      return {
+        type: 'address_of',
+        right: this.primary()
+      };
+    }
+
+    // Dereference operator
+    if (token.type === 'OPERATOR' && token.value === '*') {
+      this.advance();
+      return {
+        type: 'dereference',
+        right: this.primary()
+      };
+    }
+
+    if (token.type === 'IDENTIFIER') {
+      const id = this.advance().value;
+
+      // Array subscript
+      if (this.currentToken().type === 'LBRACKET') {
+        this.advance();
+        const index = this.expression();
+        
+        if (this.currentToken().type !== 'RBRACKET') {
+          this.errors.push({
+            message: 'Expected ] after array index',
+            position: this.currentToken().position,
+            suggestion: 'Add ] to close array subscript'
+          });
+          throw new Error('Missing ]');
+        }
+        this.advance();
+        
+        return {
+          type: 'array_access',
+          identifier: id,
+          value: index
+        };
+      }
+
+      // Function call
+      if (this.currentToken().type === 'LPAREN') {
+        this.advance();
+        const args: ASTNode[] = [];
+        
+        while (this.currentToken().type !== 'RPAREN' && this.currentToken().type !== 'EOF') {
+          args.push(this.expression());
+          if (this.currentToken().type === 'COMMA') {
+            this.advance();
+          }
+        }
+        
+        if (this.currentToken().type !== 'RPAREN') {
+          this.errors.push({
+            message: 'Expected ) after function arguments',
+            position: this.currentToken().position,
+            suggestion: 'Add ) to close function call'
+          });
+          throw new Error('Missing )');
+        }
+        this.advance();
+        
+        return {
+          type: 'function_call',
+          identifier: id,
+          arguments: args
+        };
+      }
+
+      return {
+        type: 'identifier',
+        value: id
       };
     }
     
@@ -807,7 +1386,7 @@ export function parseExpression(input: string): ParseResult {
       errors: [{
         message: 'Empty expression',
         position: 0,
-        suggestion: 'Enter an arithmetic expression (e.g., 2 + 3 * 4)'
+        suggestion: 'Enter an arithmetic expression or C program'
       }]
     };
   }
@@ -823,6 +1402,14 @@ export function formatTree(node: ASTNode, indent: number = 0): string {
   
   if (node.type === 'number') {
     return `${spaces}Number: ${node.value}`;
+  }
+
+  if (node.type === 'string') {
+    return `${spaces}String: ${node.value}`;
+  }
+
+  if (node.type === 'char') {
+    return `${spaces}Char: ${node.value}`;
   }
 
   if (node.type === 'identifier') {
@@ -848,25 +1435,78 @@ export function formatTree(node: ASTNode, indent: number = 0): string {
     return result;
   }
 
+  if (node.type === 'preprocessor') {
+    return `${spaces}Preprocessor: ${node.directive}`;
+  }
+
   if (node.type === 'declaration') {
-    let result = `${spaces}Declaration: ${node.dataType} ${node.identifier}`;
+    let result = `${spaces}Declaration: ${node.dataType}${node.isPointer ? '*' : ''} ${node.identifier}`;
+    if (node.isArray) {
+      result += `[${node.size ? (node.size.value as number) : ''}]`;
+    }
     if (node.init) {
-      result += `\n${spaces}  = \n${formatTree(node.init, indent + 2)}`;
+      result += `\n${spaces}  = \n${formatTree(node.init as ASTNode, indent + 2)}`;
     }
     return result;
   }
 
   if (node.type === 'assignment') {
-    let result = `${spaces}Assignment: ${node.identifier}\n`;
+    let result = `${spaces}Assignment${node.operator !== '=' ? ` (${node.operator})` : ''}: ${node.identifier}`;
+    if (node.left) {
+      result += `\n${spaces}  Target:\n${formatTree(node.left as ASTNode, indent + 2)}`;
+    }
+    result += `\n${spaces}  Value:`;
     if (node.value && typeof node.value === 'object' && 'type' in node.value) {
-      result += formatTree(node.value as ASTNode, indent + 1);
+      result += `\n${formatTree(node.value as ASTNode, indent + 2)}`;
+    }
+    return result;
+  }
+
+  if (node.type === 'function_call') {
+    let result = `${spaces}Function Call: ${node.identifier}(`;
+    if (node.arguments && node.arguments.length > 0) {
+      result += `\n`;
+      node.arguments.forEach(arg => {
+        result += formatTree(arg, indent + 1) + '\n';
+      });
+      result += `${spaces}`;
+    }
+    result += ')';
+    return result;
+  }
+
+  if (node.type === 'array_access') {
+    let result = `${spaces}Array Access: ${node.identifier}[`;
+    if (node.value) {
+      result += `\n${formatTree(node.value as ASTNode, indent + 1)}\n${spaces}`;
+    }
+    result += ']';
+    return result;
+  }
+
+  if (node.type === 'postfix' || node.type === 'prefix') {
+    return `${spaces}${node.type === 'prefix' ? 'Prefix' : 'Postfix'}: ${node.operator}${node.identifier}`;
+  }
+
+  if (node.type === 'address_of') {
+    let result = `${spaces}Address Of (&)\n`;
+    if (node.right) {
+      result += formatTree(node.right, indent + 1);
+    }
+    return result;
+  }
+
+  if (node.type === 'dereference') {
+    let result = `${spaces}Dereference (*)\n`;
+    if (node.right) {
+      result += formatTree(node.right, indent + 1);
     }
     return result;
   }
 
   if (node.type === 'function') {
     let result = `${spaces}Function: ${node.returnType} ${node.identifier}(`;
-    result += node.parameters?.map(p => `${p.dataType} ${p.identifier}`).join(', ') || '';
+    result += node.parameters?.map(p => `${p.type} ${p.name}`).join(', ') || '';
     result += `)\n`;
     if (node.body) {
       if (Array.isArray(node.body)) {
@@ -907,6 +1547,35 @@ export function formatTree(node: ASTNode, indent: number = 0): string {
     return result;
   }
 
+  if (node.type === 'do_while') {
+    let result = `${spaces}Do-While Loop\n`;
+    const body = Array.isArray(node.body) ? node.body[0] : node.body!;
+    result += `${spaces}  Body:\n${formatTree(body, indent + 2)}\n`;
+    result += `${spaces}  Condition:\n${formatTree(node.condition!, indent + 2)}`;
+    return result;
+  }
+
+  if (node.type === 'switch') {
+    let result = `${spaces}Switch Statement\n`;
+    result += `${spaces}  Expression:\n${formatTree(node.test!, indent + 2)}\n`;
+    if (node.cases) {
+      node.cases.forEach((c, i) => {
+        result += `${spaces}  Case ${i + 1}:\n`;
+        result += formatTree(c.value, indent + 2) + '\n';
+        c.body.forEach(stmt => {
+          result += formatTree(stmt, indent + 3) + '\n';
+        });
+      });
+    }
+    if (node.default) {
+      result += `${spaces}  Default:\n`;
+      node.default.forEach(stmt => {
+        result += formatTree(stmt, indent + 3) + '\n';
+      });
+    }
+    return result;
+  }
+
   if (node.type === 'for_loop') {
     let result = `${spaces}For Loop\n`;
     if (node.init) result += `${spaces}  Init:\n${formatTree(node.init, indent + 2)}\n`;
@@ -923,6 +1592,14 @@ export function formatTree(node: ASTNode, indent: number = 0): string {
       result += `\n${formatTree(node.value as ASTNode, indent + 1)}`;
     }
     return result;
+  }
+
+  if (node.type === 'break') {
+    return `${spaces}Break`;
+  }
+
+  if (node.type === 'continue') {
+    return `${spaces}Continue`;
   }
   
   return `${spaces}Unknown: ${node.type}`;
@@ -964,9 +1641,10 @@ export function evaluateAST(node: ASTNode): number {
     }
   }
 
-  if (node.type === 'program' || node.type === 'declaration' || 
-      node.type === 'function' || node.type === 'if_statement' ||
-      node.type === 'while_loop' || node.type === 'for_loop') {
+  if (['program', 'declaration', 'function', 'if_statement', 'while_loop', 
+       'for_loop', 'do_while', 'switch', 'function_call', 'array_access',
+       'assignment', 'break', 'continue', 'return', 'preprocessor',
+       'string', 'char', 'postfix', 'prefix', 'address_of', 'dereference'].includes(node.type)) {
     throw new Error('Cannot evaluate C program structure - this parser focuses on syntax analysis');
   }
   

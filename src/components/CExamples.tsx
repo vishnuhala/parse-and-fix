@@ -9,64 +9,64 @@ interface CExamplesProps {
 export const CExamples = ({ onSelectExample }: CExamplesProps) => {
   const validExamples = [
     {
-      title: "Simple Declaration",
-      code: "int x = 5;",
-      description: "Variable declaration with initialization"
+      title: "Factorial Program",
+      code: "#include <stdio.h>\n\nint factorial(int n) {\n  if (n <= 1) {\n    return 1;\n  }\n  return n * factorial(n - 1);\n}\n\nint main() {\n  int num = 5;\n  int result = factorial(num);\n  return 0;\n}",
+      description: "Recursive factorial calculation"
     },
     {
-      title: "Multiple Declarations",
-      code: "int a = 10;\nfloat b = 3.14;\nchar c;",
-      description: "Multiple variable declarations"
+      title: "Prime Number Check",
+      code: "#include <stdio.h>\n\nint isPrime(int n) {\n  if (n <= 1) {\n    return 0;\n  }\n  for (int i = 2; i < n; i++) {\n    if (n % i == 0) {\n      return 0;\n    }\n  }\n  return 1;\n}",
+      description: "Function to check if number is prime"
     },
     {
-      title: "Assignment Statement",
-      code: "x = 10;",
-      description: "Simple assignment to variable"
+      title: "Palindrome Check",
+      code: "int isPalindrome(int n) {\n  int reversed = 0;\n  int original = n;\n  while (n > 0) {\n    reversed = reversed * 10 + n % 10;\n    n = n / 10;\n  }\n  if (original == reversed) {\n    return 1;\n  }\n  return 0;\n}",
+      description: "Check if number is palindrome"
     },
     {
-      title: "If Statement",
-      code: "if (x > 5) {\n  y = 10;\n}",
-      description: "Conditional statement with block"
+      title: "Array Operations",
+      code: "int main() {\n  int arr[5];\n  int sum = 0;\n  for (int i = 0; i < 5; i++) {\n    arr[i] = i * 2;\n    sum += arr[i];\n  }\n  return 0;\n}",
+      description: "Array declaration and manipulation"
     },
     {
-      title: "If-Else Statement",
-      code: "if (x > 0) {\n  y = 1;\n} else {\n  y = 0;\n}",
-      description: "If-else with multiple statements"
+      title: "Pointer Usage",
+      code: "int main() {\n  int x = 10;\n  int *ptr = &x;\n  int value = *ptr;\n  *ptr = 20;\n  return 0;\n}",
+      description: "Pointer operations and dereferencing"
     },
     {
-      title: "While Loop",
-      code: "while (x < 10) {\n  x = x + 1;\n}",
-      description: "While loop with increment"
+      title: "Switch Statement",
+      code: "void checkGrade(int score) {\n  switch (score) {\n    case 90:\n      grade = 'A';\n      break;\n    case 80:\n      grade = 'B';\n      break;\n    default:\n      grade = 'F';\n      break;\n  }\n}",
+      description: "Switch-case for grade evaluation"
     },
     {
-      title: "For Loop",
-      code: "for (int i = 0; i < 10; i = i + 1) {\n  sum = sum + i;\n}",
-      description: "For loop with initialization and increment"
+      title: "Do-While Loop",
+      code: "int main() {\n  int i = 0;\n  do {\n    i++;\n  } while (i < 5);\n  return 0;\n}",
+      description: "Do-while loop example"
     },
     {
-      title: "Function Declaration",
-      code: "int add(int a, int b) {\n  return a + b;\n}",
-      description: "Function with parameters and return"
+      title: "Fibonacci Sequence",
+      code: "int fibonacci(int n) {\n  if (n <= 1) {\n    return n;\n  }\n  return fibonacci(n - 1) + fibonacci(n - 2);\n}",
+      description: "Recursive Fibonacci calculation"
     },
     {
-      title: "Nested If Statements",
-      code: "if (x > 0) {\n  if (y > 0) {\n    z = 1;\n  }\n}",
-      description: "Nested conditional statements"
+      title: "String Operations",
+      code: "int main() {\n  char str[100] = \"Hello\";\n  char ch = 'A';\n  return 0;\n}",
+      description: "String and character handling"
     },
     {
-      title: "Complex Expression",
-      code: "int result = (a + b) * (c - d);",
-      description: "Declaration with complex arithmetic"
+      title: "Function with Printf",
+      code: "#include <stdio.h>\n\nint main() {\n  int x = 42;\n  printf(\"Value: %d\", x);\n  return 0;\n}",
+      description: "Printf function call"
     },
     {
-      title: "Main Function",
-      code: "int main() {\n  int x = 5;\n  return 0;\n}",
-      description: "Complete main function structure"
+      title: "Compound Operators",
+      code: "int main() {\n  int x = 10;\n  x += 5;\n  x -= 3;\n  x *= 2;\n  x /= 4;\n  return 0;\n}",
+      description: "Using compound assignment operators"
     },
     {
-      title: "Void Function",
-      code: "void printHello() {\n  x = 1;\n}",
-      description: "Void return type function"
+      title: "Break & Continue",
+      code: "int main() {\n  for (int i = 0; i < 10; i++) {\n    if (i == 5) {\n      continue;\n    }\n    if (i == 8) {\n      break;\n    }\n  }\n  return 0;\n}",
+      description: "Loop control with break and continue"
     }
   ];
 
@@ -75,11 +75,6 @@ export const CExamples = ({ onSelectExample }: CExamplesProps) => {
       title: "Missing Semicolon",
       code: "int x = 5",
       error: "Missing semicolon after declaration"
-    },
-    {
-      title: "Missing Type",
-      code: "x = 5;",
-      error: "Variable used without declaration (context dependent)"
     },
     {
       title: "Unclosed Brace",
@@ -95,11 +90,6 @@ export const CExamples = ({ onSelectExample }: CExamplesProps) => {
       title: "Invalid Character",
       code: "int x = 5@;",
       error: "Invalid character @ in expression"
-    },
-    {
-      title: "Missing Function Body",
-      code: "int add(int a, int b);",
-      error: "Function declaration without body"
     },
     {
       title: "Unclosed Parenthesis",
@@ -127,9 +117,19 @@ export const CExamples = ({ onSelectExample }: CExamplesProps) => {
       error: "Function missing return type"
     },
     {
-      title: "Double Semicolon",
-      code: "int x = 5;;",
-      error: "Extra semicolon creates empty statement"
+      title: "Unclosed String",
+      code: "char str[] = \"Hello;",
+      error: "String literal not closed"
+    },
+    {
+      title: "Missing Array Size",
+      code: "int arr[];",
+      error: "Array declared without size"
+    },
+    {
+      title: "Invalid Break",
+      code: "int main() {\n  break;\n  return 0;\n}",
+      error: "Break outside loop or switch"
     }
   ];
 
