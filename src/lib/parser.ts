@@ -1148,9 +1148,72 @@ class Parser {
   }
 
   private expression(): ASTNode {
-    return this.additive();
+    return this.logicalOr();
   }
 
+  // Logical OR (||)
+  private logicalOr(): ASTNode {
+    let left = this.logicalAnd();
+    while (this.currentToken().type === 'LOGICAL' && this.currentToken().value === '||') {
+      const operator = this.advance().value;
+      const right = this.logicalAnd();
+      left = {
+        type: 'binary_op',
+        operator,
+        left,
+        right
+      };
+    }
+    return left;
+  }
+
+  // Logical AND (&&)
+  private logicalAnd(): ASTNode {
+    let left = this.equality();
+    while (this.currentToken().type === 'LOGICAL' && this.currentToken().value === '&&') {
+      const operator = this.advance().value;
+      const right = this.equality();
+      left = {
+        type: 'binary_op',
+        operator,
+        left,
+        right
+      };
+    }
+    return left;
+  }
+
+  // Equality (==, !=)
+  private equality(): ASTNode {
+    let left = this.relational();
+    while (this.currentToken().type === 'COMPARISON' && (this.currentToken().value === '==' || this.currentToken().value === '!=')) {
+      const operator = this.advance().value;
+      const right = this.relational();
+      left = {
+        type: 'binary_op',
+        operator,
+        left,
+        right
+      };
+    }
+    return left;
+  }
+
+  // Relational (<, >, <=, >=)
+  private relational(): ASTNode {
+    let left = this.additive();
+    while (this.currentToken().type === 'COMPARISON' && ['<', '>', '<=', '>='].includes(this.currentToken().value)) {
+      const operator = this.advance().value;
+      const right = this.additive();
+      left = {
+        type: 'binary_op',
+        operator,
+        left,
+        right
+      };
+    }
+    return left;
+  }
   private additive(): ASTNode {
     let left = this.multiplicative();
     
@@ -1243,6 +1306,17 @@ class Parser {
           identifier: id
         };
       }
+    }
+
+    // Logical NOT
+    if (token.type === 'LOGICAL' && token.value === '!') {
+      this.advance();
+      return {
+        type: 'binary_op',
+        operator: '!',
+        left: { type: 'number', value: 0 },
+        right: this.primary()
+      };
     }
 
     // Address-of operator
