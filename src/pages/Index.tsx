@@ -183,7 +183,7 @@ const Index = () => {
                 <TabsTrigger value="output">Parse Output</TabsTrigger>
                 <TabsTrigger value="tree" disabled={!result.success}>Visual Tree</TabsTrigger>
                 <TabsTrigger value="execution" disabled={!programOutput}>Execution</TabsTrigger>
-                <TabsTrigger value="eval" disabled={!evaluation && evaluation !== 0}>Evaluation</TabsTrigger>
+                <TabsTrigger value="eval" disabled={evaluation === null}>Evaluation</TabsTrigger>
               </TabsList>
               
               <TabsContent value="output" className="mt-6">
