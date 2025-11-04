@@ -1724,3 +1724,260 @@ export function evaluateAST(node: ASTNode): number {
   
   throw new Error(`Invalid AST node type: ${node.type}`);
 }
+
+// ============= C Program Interpreter =============
+
+export interface ExecutionResult {
+  output: string[];
+  returnValue: number | null;
+  variables: Record<string, any>;
+  error?: string;
+}
+
+class Interpreter {
+  private variables: Map<string, any> = new Map();
+  private functions: Map<string, { params: any[], body: ASTNode | ASTNode[], returnType: string }> = new Map();
+  private output: string[] = [];
+  private returnValue: number | null = null;
+  private breakFlag = false;
+  private continueFlag = false;
+
+  execute(node: ASTNode): ExecutionResult {
+    try {
+      this.interpretNode(node);
+      return {
+        output: this.output,
+        returnValue: this.returnValue,
+        variables: Object.fromEntries(this.variables)
+      };
+    } catch (error) {
+      return {
+        output: this.output,
+        returnValue: null,
+        variables: Object.fromEntries(this.variables),
+        error: error instanceof Error ? error.message : "Execution error"
+      };
+    }
+  }
+
+  private interpretNode(node: ASTNode | ASTNode[]): any {
+    if (Array.isArray(node)) {
+      let lastValue;
+      for (const stmt of node) {
+        if (this.returnValue !== null || this.breakFlag || this.continueFlag) break;
+        lastValue = this.interpretNode(stmt);
+      }
+      return lastValue;
+    }
+
+    switch (node.type) {
+      case 'program':
+        return this.interpretNode(node.statements || []);
+      
+      case 'function_declaration':
+        this.functions.set(node.identifier!, {
+          params: node.parameters || [],
+          body: node.body!,
+          returnType: node.returnType || 'int'
+        });
+        // Auto-execute main function if it exists
+        if (node.identifier === 'main') {
+          const result = this.callFunction('main', []);
+          this.returnValue = result;
+        }
+        return null;
+      
+      case 'declaration':
+        const initValue = node.init ? this.interpretNode(node.init) : 0;
+        this.variables.set(node.identifier!, initValue);
+        return null;
+      
+      case 'assignment':
+        const value = this.interpretNode(node.right!);
+        this.variables.set(node.identifier!, value);
+        return value;
+      
+      case 'if_statement':
+        const condition = this.interpretNode(node.condition!);
+        if (this.isTruthy(condition)) {
+          return this.interpretNode(node.body!);
+        } else if (node.elseBranch) {
+          return this.interpretNode(node.elseBranch);
+        }
+        return null;
+      
+      case 'while_loop':
+        while (this.isTruthy(this.interpretNode(node.condition!))) {
+          this.interpretNode(node.body!);
+          if (this.returnValue !== null || this.breakFlag) break;
+          if (this.continueFlag) {
+            this.continueFlag = false;
+            continue;
+          }
+        }
+        this.breakFlag = false;
+        return null;
+      
+      case 'do_while_loop':
+        do {
+          this.interpretNode(node.body!);
+          if (this.returnValue !== null || this.breakFlag) break;
+          if (this.continueFlag) {
+            this.continueFlag = false;
+            continue;
+          }
+        } while (this.isTruthy(this.interpretNode(node.condition!)));
+        this.breakFlag = false;
+        return null;
+      
+      case 'for_loop':
+        if (node.init) this.interpretNode(node.init);
+        while (node.condition ? this.isTruthy(this.interpretNode(node.condition)) : true) {
+          this.interpretNode(node.body!);
+          if (this.returnValue !== null || this.breakFlag) break;
+          if (this.continueFlag) {
+            this.continueFlag = false;
+          }
+          if (node.increment) this.interpretNode(node.increment);
+        }
+        this.breakFlag = false;
+        return null;
+      
+      case 'switch_statement':
+        const testValue = this.interpretNode(node.test!);
+        let matched = false;
+        let executeDefault = true;
+        
+        for (const caseNode of node.cases || []) {
+          const caseValue = this.interpretNode(caseNode.value);
+          if (testValue === caseValue || matched) {
+            matched = true;
+            executeDefault = false;
+            this.interpretNode(caseNode.body);
+            if (this.breakFlag) {
+              this.breakFlag = false;
+              break;
+            }
+          }
+        }
+        
+        if (executeDefault && node.default) {
+          this.interpretNode(node.default);
+          this.breakFlag = false;
+        }
+        return null;
+      
+      case 'return_statement':
+        if (node.value) {
+          if (typeof node.value === 'object') {
+            this.returnValue = this.interpretNode(node.value as ASTNode);
+          } else {
+            this.returnValue = typeof node.value === 'number' ? node.value : 0;
+          }
+        } else {
+          this.returnValue = 0;
+        }
+        return this.returnValue;
+      
+      case 'break_statement':
+        this.breakFlag = true;
+        return null;
+      
+      case 'continue_statement':
+        this.continueFlag = true;
+        return null;
+      
+      case 'function_call':
+        return this.callFunction(node.identifier!, node.arguments || []);
+      
+      case 'binary_op':
+        return this.evaluateBinaryOp(node);
+      
+      case 'unary_op':
+        const operand = this.interpretNode(node.right!);
+        if (node.operator === '-') return -operand;
+        if (node.operator === '!') return operand ? 0 : 1;
+        return operand;
+      
+      case 'identifier':
+        if (!this.variables.has(node.identifier!)) {
+          return 0; // Default value for undefined variables
+        }
+        return this.variables.get(node.identifier!);
+      
+      case 'number':
+        return node.value;
+      
+      case 'preprocessor':
+        return null; // Ignore preprocessor directives during execution
+      
+      default:
+        return null;
+    }
+  }
+
+  private callFunction(name: string, args: ASTNode[]): any {
+    if (name === 'printf') {
+      const evaluatedArgs = args.map(arg => this.interpretNode(arg));
+      this.output.push(evaluatedArgs.map(String).join(' '));
+      return 0;
+    }
+
+    const func = this.functions.get(name);
+    if (!func) {
+      throw new Error(`Function ${name} not defined`);
+    }
+
+    // Create new scope for function parameters
+    const previousVars = new Map(this.variables);
+    const evaluatedArgs = args.map(arg => this.interpretNode(arg));
+    
+    func.params.forEach((param, i) => {
+      this.variables.set(param.name, evaluatedArgs[i] || 0);
+    });
+
+    const previousReturn = this.returnValue;
+    this.returnValue = null;
+
+    this.interpretNode(func.body);
+    const result = this.returnValue !== null ? this.returnValue : 0;
+
+    // Restore previous scope
+    this.returnValue = previousReturn;
+    this.variables = previousVars;
+
+    return result;
+  }
+
+  private evaluateBinaryOp(node: ASTNode): any {
+    const left = this.interpretNode(node.left!);
+    const right = this.interpretNode(node.right!);
+
+    switch (node.operator) {
+      case '+': return left + right;
+      case '-': return left - right;
+      case '*': return left * right;
+      case '/': return Math.floor(left / right);
+      case '%': return left % right;
+      case '==': return left === right ? 1 : 0;
+      case '!=': return left !== right ? 1 : 0;
+      case '<': return left < right ? 1 : 0;
+      case '>': return left > right ? 1 : 0;
+      case '<=': return left <= right ? 1 : 0;
+      case '>=': return left >= right ? 1 : 0;
+      case '&&': return (left && right) ? 1 : 0;
+      case '||': return (left || right) ? 1 : 0;
+      case '!': return right ? 0 : 1;
+      default: return 0;
+    }
+  }
+
+  private isTruthy(value: any): boolean {
+    return value !== 0 && value !== null && value !== undefined;
+  }
+}
+
+export function executeProgram(ast: ASTNode): ExecutionResult {
+  const interpreter = new Interpreter();
+  return interpreter.execute(ast);
+}
