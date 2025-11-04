@@ -1,13 +1,15 @@
 import { useState } from "react";
-import { parseExpression, ParseResult, evaluateAST, Token, Lexer } from "@/lib/parser";
+import { parseExpression, ParseResult, evaluateAST, Token, Lexer, executeProgram, ExecutionResult } from "@/lib/parser";
 import { ParserInput } from "@/components/ParserInput";
 import { ParseOutput } from "@/components/ParseOutput";
 import { ExampleExpressions } from "@/components/ExampleExpressions";
+import { CExamples } from "@/components/CExamples";
 import { TokenVisualization } from "@/components/TokenVisualization";
 import { GrammarRules } from "@/components/GrammarRules";
 import { TreeVisualization } from "@/components/TreeVisualization";
 import { EvaluationResult } from "@/components/EvaluationResult";
 import { ExportResults } from "@/components/ExportResults";
+import { ProgramOutput } from "@/components/ProgramOutput";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -20,6 +22,7 @@ const Index = () => {
   const [tokens, setTokens] = useState<Token[]>([]);
   const [evaluation, setEvaluation] = useState<number | null>(null);
   const [evalError, setEvalError] = useState<string>("");
+  const [programOutput, setProgramOutput] = useState<ExecutionResult | null>(null);
 
   const handleParse = () => {
     if (!expression.trim()) {
@@ -35,20 +38,38 @@ const Index = () => {
     const parseResult = parseExpression(expression);
     setResult(parseResult);
 
-    // Try to evaluate if successful
+    // Try to execute C program or evaluate arithmetic
     if (parseResult.success && parseResult.tree) {
       try {
-        const evalResult = evaluateAST(parseResult.tree);
-        setEvaluation(evalResult);
-        setEvalError("");
-        toast.success("Expression parsed and evaluated successfully!");
-      } catch (error) {
+        // Try executing as C program first
+        const execResult = executeProgram(parseResult.tree);
+        setProgramOutput(execResult);
         setEvaluation(null);
-        setEvalError(error instanceof Error ? error.message : "Evaluation failed");
-        toast.success("Expression parsed successfully!");
+        setEvalError("");
+        
+        if (execResult.error) {
+          toast.error("Execution error: " + execResult.error);
+        } else {
+          toast.success("Program executed successfully!");
+        }
+      } catch (error) {
+        // If execution fails, try arithmetic evaluation
+        try {
+          const evalResult = evaluateAST(parseResult.tree);
+          setEvaluation(evalResult);
+          setProgramOutput(null);
+          setEvalError("");
+          toast.success("Expression parsed and evaluated successfully!");
+        } catch (evalError) {
+          setEvaluation(null);
+          setProgramOutput(null);
+          setEvalError(evalError instanceof Error ? evalError.message : "Evaluation failed");
+          toast.success("Expression parsed successfully!");
+        }
       }
     } else {
       setEvaluation(null);
+      setProgramOutput(null);
       setEvalError("");
       toast.error("Syntax error detected");
     }
@@ -60,6 +81,7 @@ const Index = () => {
     setTokens([]);
     setEvaluation(null);
     setEvalError("");
+    setProgramOutput(null);
   };
 
   const handleExampleSelect = (example: string) => {
@@ -68,6 +90,7 @@ const Index = () => {
     setTokens([]);
     setEvaluation(null);
     setEvalError("");
+    setProgramOutput(null);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -85,10 +108,10 @@ const Index = () => {
             Mini Parser with Error Suggestions
           </h1>
           <p className="text-muted-foreground text-lg mb-2">
-            Advanced arithmetic expression parser with intelligent error recovery
+            Comprehensive C & Arithmetic Expression Parser with Error Recovery
           </p>
           <p className="text-sm text-muted-foreground">
-            Lexical Analysis • Syntax Analysis • Error Detection • AST Evaluation
+            Lexical Analysis • Syntax Analysis • Semantic Evaluation • Error Detection & Recovery
           </p>
         </div>
 
@@ -133,7 +156,22 @@ const Index = () => {
           </Card>
 
           <div className="grid md:grid-cols-2 gap-6">
-            <ExampleExpressions onSelect={handleExampleSelect} />
+            <Card className="p-6 bg-card/50 backdrop-blur-sm">
+              <Tabs defaultValue="c-examples" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 mb-4">
+                  <TabsTrigger value="c-examples">C Programs</TabsTrigger>
+                  <TabsTrigger value="arithmetic">Arithmetic</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="c-examples">
+                  <CExamples onSelectExample={handleExampleSelect} />
+                </TabsContent>
+                
+                <TabsContent value="arithmetic">
+                  <ExampleExpressions onSelect={handleExampleSelect} />
+                </TabsContent>
+              </Tabs>
+            </Card>
             <GrammarRules />
           </div>
 
@@ -141,10 +179,11 @@ const Index = () => {
 
           {result && (
             <Tabs defaultValue="output" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="output">Parse Output</TabsTrigger>
                 <TabsTrigger value="tree" disabled={!result.success}>Visual Tree</TabsTrigger>
-                <TabsTrigger value="eval" disabled={!result.success}>Evaluation</TabsTrigger>
+                <TabsTrigger value="execution" disabled={!programOutput}>Execution</TabsTrigger>
+                <TabsTrigger value="eval" disabled={evaluation === null}>Evaluation</TabsTrigger>
               </TabsList>
               
               <TabsContent value="output" className="mt-6">
@@ -153,6 +192,10 @@ const Index = () => {
               
               <TabsContent value="tree" className="mt-6">
                 {result.tree && <TreeVisualization tree={result.tree} />}
+              </TabsContent>
+              
+              <TabsContent value="execution" className="mt-6">
+                {programOutput && <ProgramOutput result={programOutput} />}
               </TabsContent>
               
               <TabsContent value="eval" className="mt-6">
