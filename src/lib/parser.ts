@@ -1731,6 +1731,7 @@ export interface ExecutionResult {
   output: string[];
   returnValue: number | null;
   variables: Record<string, any>;
+  executionSteps: string[];
   error?: string;
 }
 
@@ -1738,9 +1739,11 @@ class Interpreter {
   private variables: Map<string, any> = new Map();
   private functions: Map<string, { params: any[], body: ASTNode | ASTNode[], returnType: string }> = new Map();
   private output: string[] = [];
+  private executionSteps: string[] = [];
   private returnValue: number | null = null;
   private breakFlag = false;
   private continueFlag = false;
+  private callDepth = 0;
 
   execute(node: ASTNode): ExecutionResult {
     try {
@@ -1748,13 +1751,15 @@ class Interpreter {
       return {
         output: this.output,
         returnValue: this.returnValue,
-        variables: Object.fromEntries(this.variables)
+        variables: Object.fromEntries(this.variables),
+        executionSteps: this.executionSteps
       };
     } catch (error) {
       return {
         output: this.output,
         returnValue: null,
         variables: Object.fromEntries(this.variables),
+        executionSteps: this.executionSteps,
         error: error instanceof Error ? error.message : "Execution error"
       };
     }
@@ -1780,21 +1785,26 @@ class Interpreter {
           body: node.body!,
           returnType: node.returnType || 'int'
         });
+        this.executionSteps.push(`Defined function: ${node.identifier}(${(node.parameters || []).map(p => p.name).join(', ')})`);
         // Auto-execute main function if it exists
         if (node.identifier === 'main') {
+          this.executionSteps.push('Executing main() function...');
           const result = this.callFunction('main', []);
           this.returnValue = result;
+          this.executionSteps.push(`main() returned: ${result}`);
         }
         return null;
       
       case 'declaration':
         const initValue = node.init ? this.interpretNode(node.init) : 0;
         this.variables.set(node.identifier!, initValue);
+        this.executionSteps.push(`${node.identifier} = ${initValue}`);
         return null;
       
       case 'assignment':
         const value = this.interpretNode(node.right!);
         this.variables.set(node.identifier!, value);
+        this.executionSteps.push(`${node.identifier} = ${value}`);
         return value;
       
       case 'if_statement':
@@ -1919,7 +1929,9 @@ class Interpreter {
   private callFunction(name: string, args: ASTNode[]): any {
     if (name === 'printf') {
       const evaluatedArgs = args.map(arg => this.interpretNode(arg));
-      this.output.push(evaluatedArgs.map(String).join(' '));
+      const output = evaluatedArgs.map(String).join(' ');
+      this.output.push(output);
+      this.executionSteps.push(`printf: "${output}"`);
       return 0;
     }
 
@@ -1932,6 +1944,10 @@ class Interpreter {
     const previousVars = new Map(this.variables);
     const evaluatedArgs = args.map(arg => this.interpretNode(arg));
     
+    const indent = '  '.repeat(this.callDepth);
+    this.callDepth++;
+    this.executionSteps.push(`${indent}→ ${name}(${evaluatedArgs.join(', ')})`);
+    
     func.params.forEach((param, i) => {
       this.variables.set(param.name, evaluatedArgs[i] || 0);
     });
@@ -1941,6 +1957,9 @@ class Interpreter {
 
     this.interpretNode(func.body);
     const result = this.returnValue !== null ? this.returnValue : 0;
+
+    this.callDepth--;
+    this.executionSteps.push(`${indent}← ${name} returns ${result}`);
 
     // Restore previous scope
     this.returnValue = previousReturn;

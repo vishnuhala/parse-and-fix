@@ -1,5 +1,5 @@
 import { Card } from "@/components/ui/card";
-import { Terminal, CheckCircle2, XCircle, Variable } from "lucide-react";
+import { Terminal, CheckCircle2, XCircle, Variable, ArrowRight } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ExecutionResult } from "@/lib/parser";
 
@@ -26,12 +26,27 @@ export const ProgramOutput = ({ result }: ProgramOutputProps) => {
         </Alert>
       )}
 
-      {/* Program Output */}
-      {result.output.length > 0 && (
+      {/* Execution Steps */}
+      {result.executionSteps && result.executionSteps.length > 0 && (
         <Card className="p-6 bg-card/50 border-primary/20">
           <div className="flex items-center gap-2 mb-4">
-            <Terminal className="w-5 h-5 text-primary" />
-            <h3 className="font-semibold text-primary">Program Output</h3>
+            <ArrowRight className="w-5 h-5 text-primary" />
+            <h3 className="font-semibold text-primary">Execution Flow</h3>
+          </div>
+          <div className="bg-code-bg p-4 rounded-lg font-mono text-xs space-y-1 max-h-[300px] overflow-y-auto">
+            {result.executionSteps.map((step, i) => (
+              <div key={i} className="text-foreground">{step}</div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Program Output */}
+      {result.output.length > 0 && (
+        <Card className="p-6 bg-card/50 border-success/20">
+          <div className="flex items-center gap-2 mb-4">
+            <Terminal className="w-5 h-5 text-success" />
+            <h3 className="font-semibold text-success">Console Output</h3>
           </div>
           <div className="bg-code-bg p-4 rounded-lg font-mono text-sm space-y-1">
             {result.output.map((line, i) => (
@@ -47,7 +62,7 @@ export const ProgramOutput = ({ result }: ProgramOutputProps) => {
           <div className="flex items-center gap-3">
             <CheckCircle2 className="w-6 h-6 text-accent" />
             <div>
-              <p className="text-sm text-muted-foreground mb-1">Return Value</p>
+              <p className="text-sm text-muted-foreground mb-1">Final Return Value</p>
               <p className="text-3xl font-bold text-accent font-mono">
                 {result.returnValue}
               </p>
@@ -61,7 +76,7 @@ export const ProgramOutput = ({ result }: ProgramOutputProps) => {
         <Card className="p-6 bg-card/50 border-muted">
           <div className="flex items-center gap-2 mb-4">
             <Variable className="w-5 h-5 text-muted-foreground" />
-            <h3 className="font-semibold">Variable State</h3>
+            <h3 className="font-semibold">Final Variable State</h3>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {Object.entries(result.variables).map(([name, value]) => (
