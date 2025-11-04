@@ -32,7 +32,7 @@ export const ParserInput = ({ value, onChange, error }: ParserInputProps) => {
         )}
       </div>
       <p className="text-xs text-muted-foreground">
-        Supports C programs and arithmetic expressions (+, -, *, /, %, ^, parentheses)
+        Supports: +, -, *, /, %, ^ (power), and parentheses
       </p>
     </div>
   );

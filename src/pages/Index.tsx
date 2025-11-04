@@ -1,28 +1,16 @@
 import { useState } from "react";
-import { parseExpression, ParseResult, evaluateAST, Token, Lexer, executeProgram, ExecutionResult } from "@/lib/parser";
+import { parseExpression, ParseResult } from "@/lib/parser";
 import { ParserInput } from "@/components/ParserInput";
 import { ParseOutput } from "@/components/ParseOutput";
 import { ExampleExpressions } from "@/components/ExampleExpressions";
-import { CExamples } from "@/components/CExamples";
-import { TokenVisualization } from "@/components/TokenVisualization";
-import { GrammarRules } from "@/components/GrammarRules";
-import { TreeVisualization } from "@/components/TreeVisualization";
-import { EvaluationResult } from "@/components/EvaluationResult";
-import { ExportResults } from "@/components/ExportResults";
-import { ProgramOutput } from "@/components/ProgramOutput";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PlayCircle, RotateCcw } from "lucide-react";
+import { Play, Cpu } from "lucide-react";
 import { toast } from "sonner";
 
 const Index = () => {
   const [expression, setExpression] = useState("");
   const [result, setResult] = useState<ParseResult | null>(null);
-  const [tokens, setTokens] = useState<Token[]>([]);
-  const [evaluation, setEvaluation] = useState<number | null>(null);
-  const [evalError, setEvalError] = useState<string>("");
-  const [programOutput, setProgramOutput] = useState<ExecutionResult | null>(null);
 
   const handleParse = () => {
     if (!expression.trim()) {
@@ -30,67 +18,19 @@ const Index = () => {
       return;
     }
 
-    // Get tokens from lexer
-    const lexer = new Lexer(expression);
-    const tokenList = lexer.tokenize();
-    setTokens(tokenList);
-
     const parseResult = parseExpression(expression);
     setResult(parseResult);
 
-    // Try to execute C program or evaluate arithmetic
-    if (parseResult.success && parseResult.tree) {
-      try {
-        // Try executing as C program first
-        const execResult = executeProgram(parseResult.tree);
-        setProgramOutput(execResult);
-        setEvaluation(null);
-        setEvalError("");
-        
-        if (execResult.error) {
-          toast.error("Execution error: " + execResult.error);
-        } else {
-          toast.success("Program executed successfully!");
-        }
-      } catch (error) {
-        // If execution fails, try arithmetic evaluation
-        try {
-          const evalResult = evaluateAST(parseResult.tree);
-          setEvaluation(evalResult);
-          setProgramOutput(null);
-          setEvalError("");
-          toast.success("Expression parsed and evaluated successfully!");
-        } catch (evalError) {
-          setEvaluation(null);
-          setProgramOutput(null);
-          setEvalError(evalError instanceof Error ? evalError.message : "Evaluation failed");
-          toast.success("Expression parsed successfully!");
-        }
-      }
+    if (parseResult.success) {
+      toast.success("Expression parsed successfully!");
     } else {
-      setEvaluation(null);
-      setProgramOutput(null);
-      setEvalError("");
       toast.error("Syntax error detected");
     }
   };
 
-  const handleClear = () => {
-    setExpression("");
+  const handleExampleSelect = (expr: string) => {
+    setExpression(expr);
     setResult(null);
-    setTokens([]);
-    setEvaluation(null);
-    setEvalError("");
-    setProgramOutput(null);
-  };
-
-  const handleExampleSelect = (example: string) => {
-    setExpression(example);
-    setResult(null);
-    setTokens([]);
-    setEvaluation(null);
-    setEvalError("");
-    setProgramOutput(null);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -100,110 +40,77 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
+    <div className="min-h-screen bg-background py-8 px-4">
+      <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent animate-fade-in">
-            Mini Parser with Error Suggestions
+        <header className="text-center mb-12">
+          <div className="inline-flex items-center gap-3 mb-4">
+            <div className="p-3 bg-primary/10 rounded-xl border border-primary/20 glow-primary">
+              <Cpu className="w-8 h-8 text-primary" />
+            </div>
+          </div>
+          <h1 className="text-4xl md:text-5xl font-bold mb-3 bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
+            Mini Parser
           </h1>
-          <p className="text-muted-foreground text-lg mb-2">
-            Comprehensive C & Arithmetic Expression Parser with Error Recovery
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Arithmetic expression parser with intelligent error detection and helpful recovery suggestions
           </p>
-          <p className="text-sm text-muted-foreground">
-            Lexical Analysis • Syntax Analysis • Semantic Evaluation • Error Detection & Recovery
-          </p>
-        </div>
+        </header>
 
-        {/* Main Content */}
-        <div className="space-y-6">
-          <Card className="p-6 bg-card/50 backdrop-blur-sm border-border shadow-lg">
+        <div className="grid lg:grid-cols-2 gap-8 mb-8">
+          {/* Input Section */}
+          <Card className="p-6 bg-card border-border">
             <div onKeyDown={handleKeyPress}>
               <ParserInput
                 value={expression}
                 onChange={setExpression}
                 error={result?.errors?.[0]}
               />
-
-              <div className="flex gap-3 mt-4">
-                <Button
-                  onClick={handleParse}
-                  className="flex-1 gap-2"
-                  disabled={!expression.trim()}
-                >
-                  <PlayCircle className="w-4 h-4" />
-                  Parse Expression
-                  <span className="ml-auto text-xs opacity-70">Ctrl+Enter</span>
-                </Button>
-                <Button
-                  onClick={handleClear}
-                  variant="outline"
-                  className="gap-2"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                  Clear
-                </Button>
-                {result && (
-                  <ExportResults 
-                    expression={expression}
-                    result={result}
-                    tokens={tokens}
-                    evaluation={evaluation}
-                  />
-                )}
-              </div>
+              <Button
+                onClick={handleParse}
+                className="w-full mt-4 bg-primary hover:bg-primary/90 glow-primary transition-all"
+                size="lg"
+              >
+                <Play className="w-4 h-4 mr-2" />
+                Parse Expression
+                <span className="ml-auto text-xs opacity-70">Ctrl+Enter</span>
+              </Button>
             </div>
           </Card>
 
-          <div className="grid md:grid-cols-2 gap-6">
-            <Card className="p-6 bg-card/50 backdrop-blur-sm">
-              <Tabs defaultValue="c-examples" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 mb-4">
-                  <TabsTrigger value="c-examples">C Programs</TabsTrigger>
-                  <TabsTrigger value="arithmetic">Arithmetic</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="c-examples">
-                  <CExamples onSelectExample={handleExampleSelect} />
-                </TabsContent>
-                
-                <TabsContent value="arithmetic">
-                  <ExampleExpressions onSelect={handleExampleSelect} />
-                </TabsContent>
-              </Tabs>
-            </Card>
-            <GrammarRules />
+          {/* Output Section */}
+          <div>
+            <ParseOutput result={result} />
           </div>
-
-          {tokens.length > 0 && <TokenVisualization tokens={tokens} />}
-
-          {result && (
-            <Tabs defaultValue="output" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="output">Parse Output</TabsTrigger>
-                <TabsTrigger value="tree" disabled={!result.success}>Visual Tree</TabsTrigger>
-                <TabsTrigger value="execution" disabled={!programOutput}>Execution</TabsTrigger>
-                <TabsTrigger value="eval" disabled={evaluation === null}>Evaluation</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="output" className="mt-6">
-                <ParseOutput result={result} />
-              </TabsContent>
-              
-              <TabsContent value="tree" className="mt-6">
-                {result.tree && <TreeVisualization tree={result.tree} />}
-              </TabsContent>
-              
-              <TabsContent value="execution" className="mt-6">
-                {programOutput && <ProgramOutput result={programOutput} />}
-              </TabsContent>
-              
-              <TabsContent value="eval" className="mt-6">
-                <EvaluationResult result={evaluation} error={evalError} />
-              </TabsContent>
-            </Tabs>
-          )}
         </div>
+
+        {/* Examples Section */}
+        <ExampleExpressions onSelect={handleExampleSelect} />
+
+        {/* Footer Info */}
+        <Card className="mt-8 p-6 bg-card/50 border-border">
+          <h3 className="font-semibold mb-3 flex items-center gap-2">
+            <Cpu className="w-4 h-4 text-primary" />
+            About This Parser
+          </h3>
+          <div className="text-sm text-muted-foreground space-y-2">
+            <p>
+              This mini parser demonstrates syntactic analysis with error recovery capabilities.
+              It tokenizes input, builds an abstract syntax tree (AST), and provides contextual
+              error messages with actionable suggestions.
+            </p>
+            <div className="grid sm:grid-cols-2 gap-4 mt-4 pt-4 border-t border-border">
+              <div>
+                <p className="font-medium text-foreground mb-1">Supported Operators</p>
+                <p className="font-mono text-xs">+, -, *, /, %, ^ (power)</p>
+              </div>
+              <div>
+                <p className="font-medium text-foreground mb-1">Features</p>
+                <p className="text-xs">Precedence handling, unary operators, nested parentheses</p>
+              </div>
+            </div>
+          </div>
+        </Card>
       </div>
     </div>
   );
