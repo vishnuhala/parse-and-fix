@@ -32,7 +32,7 @@ export interface ASTNode {
   right?: ASTNode;
 }
 
-class Lexer {
+export class Lexer {
   private input: string;
   private position: number = 0;
 
@@ -343,4 +343,39 @@ export function formatTree(node: ASTNode, indent: number = 0): string {
   }
   
   return `${spaces}Unknown`;
+}
+
+export function evaluateAST(node: ASTNode): number {
+  if (node.type === 'number') {
+    return node.value || 0;
+  }
+  
+  if (node.type === 'binary_op' && node.left && node.right) {
+    const left = evaluateAST(node.left);
+    const right = evaluateAST(node.right);
+    
+    switch (node.operator) {
+      case '+':
+        return left + right;
+      case '-':
+        return left - right;
+      case '*':
+        return left * right;
+      case '/':
+        if (right === 0) throw new Error('Division by zero');
+        return left / right;
+      case '%':
+        return left % right;
+      case '^':
+        return Math.pow(left, right);
+      case 'unary_neg':
+        return -right;
+      case 'unary_pos':
+        return right;
+      default:
+        throw new Error(`Unknown operator: ${node.operator}`);
+    }
+  }
+  
+  throw new Error('Invalid AST node');
 }
