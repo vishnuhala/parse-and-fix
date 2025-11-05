@@ -1,4 +1,35 @@
-export type TokenType = 
+// ============= Mini C Parser with Complete Error Recovery =============
+//
+// This parser implements ALL FOUR phases of compilation:
+//
+// 1. LEXICAL ANALYSIS (Lexer class)
+//    - Tokenizes C programs and arithmetic expressions
+//    - Handles 27+ token types including keywords, operators, literals
+//    - Supports C comments, preprocessor directives, strings, numbers
+//    - Works for BOTH C programs AND arithmetic expressions
+//
+// 2. SYNTAX ANALYSIS (Parser class)
+//    - Builds Abstract Syntax Trees (AST) from token streams
+//    - Implements recursive descent parsing with operator precedence
+//    - Automatically detects C programs vs arithmetic expressions
+//    - Works for BOTH C programs AND arithmetic expressions
+//
+// 3. SEMANTIC EVALUATION
+//    - evaluateAST(): Evaluates arithmetic expression ASTs
+//    - executeProgram() + Interpreter: Executes C program ASTs
+//    - Variable management, function calls, control flow
+//    - Works for BOTH C programs AND arithmetic expressions
+//
+// 4. ERROR DETECTION & RECOVERY
+//    - Error Detection: Identifies syntax errors with precise positions
+//    - Error Messages: Clear, actionable suggestions for each error
+//    - Error Recovery: Synchronization-based panic mode recovery
+//    - Continues parsing after errors to find multiple issues
+//    - Works for BOTH C programs AND arithmetic expressions
+//
+// =======================================================================
+
+export type TokenType =
   | 'NUMBER' 
   | 'OPERATOR' 
   | 'LPAREN' 
@@ -488,61 +519,93 @@ class Parser {
   private statement(): ASTNode {
     const token = this.currentToken();
     
-    // Declaration
-    if (token.type === 'KEYWORD' && ['int', 'float', 'char', 'void', 'double', 'long', 'short', 'unsigned', 'signed'].includes(token.value)) {
-      return this.declaration();
+    try {
+      // Declaration
+      if (token.type === 'KEYWORD' && ['int', 'float', 'char', 'void', 'double', 'long', 'short', 'unsigned', 'signed'].includes(token.value)) {
+        return this.declaration();
+      }
+      
+      // Control structures
+      if (token.type === 'KEYWORD' && token.value === 'if') {
+        return this.ifStatement();
+      }
+      if (token.type === 'KEYWORD' && token.value === 'while') {
+        return this.whileLoop();
+      }
+      if (token.type === 'KEYWORD' && token.value === 'for') {
+        return this.forLoop();
+      }
+      if (token.type === 'KEYWORD' && token.value === 'do') {
+        return this.doWhileLoop();
+      }
+      if (token.type === 'KEYWORD' && token.value === 'switch') {
+        return this.switchStatement();
+      }
+      if (token.type === 'KEYWORD' && token.value === 'break') {
+        this.advance();
+        if (this.currentToken().type === 'SEMICOLON') {
+          this.advance();
+        }
+        return { type: 'break' };
+      }
+      if (token.type === 'KEYWORD' && token.value === 'continue') {
+        this.advance();
+        if (this.currentToken().type === 'SEMICOLON') {
+          this.advance();
+        }
+        return { type: 'continue' };
+      }
+      if (token.type === 'KEYWORD' && token.value === 'return') {
+        return this.returnStatement();
+      }
+      
+      // Block
+      if (token.type === 'LBRACE') {
+        return this.block();
+      }
+      
+      // Assignment or expression statement
+      if (token.type === 'IDENTIFIER') {
+        return this.assignmentOrExpression();
+      }
+      
+      this.errors.push({
+        message: `Unexpected token '${token.value}'`,
+        position: token.position,
+        suggestion: 'Expected declaration, statement, or expression'
+      });
+      this.synchronize(); // Error recovery
+      return { type: 'error', value: token.value };
+    } catch (error) {
+      this.synchronize(); // Recover at next statement
+      return { type: 'error', value: token.value };
     }
-    
-    // Control structures
-    if (token.type === 'KEYWORD' && token.value === 'if') {
-      return this.ifStatement();
-    }
-    if (token.type === 'KEYWORD' && token.value === 'while') {
-      return this.whileLoop();
-    }
-    if (token.type === 'KEYWORD' && token.value === 'for') {
-      return this.forLoop();
-    }
-    if (token.type === 'KEYWORD' && token.value === 'do') {
-      return this.doWhileLoop();
-    }
-    if (token.type === 'KEYWORD' && token.value === 'switch') {
-      return this.switchStatement();
-    }
-    if (token.type === 'KEYWORD' && token.value === 'break') {
-      this.advance();
+  }
+
+  // Error Recovery: Skip to next synchronization point
+  private synchronize() {
+    while (this.currentToken().type !== 'EOF') {
+      // Stop at statement boundaries
       if (this.currentToken().type === 'SEMICOLON') {
         this.advance();
+        return;
       }
-      return { type: 'break' };
-    }
-    if (token.type === 'KEYWORD' && token.value === 'continue') {
+      
+      // Stop at control flow keywords
+      if (this.currentToken().type === 'KEYWORD') {
+        const keyword = this.currentToken().value;
+        if (['if', 'while', 'for', 'return', 'int', 'float', 'char', 'void'].includes(keyword)) {
+          return;
+        }
+      }
+      
+      // Stop at block boundaries
+      if (this.currentToken().type === 'RBRACE' || this.currentToken().type === 'LBRACE') {
+        return;
+      }
+      
       this.advance();
-      if (this.currentToken().type === 'SEMICOLON') {
-        this.advance();
-      }
-      return { type: 'continue' };
     }
-    if (token.type === 'KEYWORD' && token.value === 'return') {
-      return this.returnStatement();
-    }
-    
-    // Block
-    if (token.type === 'LBRACE') {
-      return this.block();
-    }
-    
-    // Assignment or expression statement
-    if (token.type === 'IDENTIFIER') {
-      return this.assignmentOrExpression();
-    }
-    
-    this.errors.push({
-      message: `Unexpected token '${token.value}'`,
-      position: token.position,
-      suggestion: 'Expected declaration, statement, or expression'
-    });
-    throw new Error('Unexpected token');
   }
 
   private declaration(): ASTNode {
@@ -561,7 +624,8 @@ class Parser {
         position: this.currentToken().position,
         suggestion: `Add variable name after '${dataType}'`
       });
-      throw new Error('Expected identifier');
+      this.synchronize();
+      return { type: 'error', value: 'missing_identifier' };
     }
     
     const identifier = this.advance().value;
@@ -582,7 +646,8 @@ class Parser {
           position: this.currentToken().position,
           suggestion: 'Add ] to close array declaration'
         });
-        throw new Error('Missing ]');
+        this.synchronize();
+        return { type: 'error', value: 'missing_bracket' };
       }
       this.advance();
       
@@ -594,13 +659,14 @@ class Parser {
       
       if (this.currentToken().type !== 'SEMICOLON') {
         this.errors.push({
-          message: 'Missing semicolon',
+          message: 'Missing semicolon after array declaration',
           position: this.currentToken().position,
           suggestion: 'Add ; after array declaration'
         });
-        throw new Error('Missing semicolon');
+        // Continue parsing without semicolon
+      } else {
+        this.advance();
       }
-      this.advance();
       
       return {
         type: 'declaration',
@@ -627,13 +693,14 @@ class Parser {
     
     if (this.currentToken().type !== 'SEMICOLON') {
       this.errors.push({
-        message: 'Missing semicolon',
+        message: 'Missing semicolon after variable declaration',
         position: this.currentToken().position,
         suggestion: `Add ';' after declaration`
       });
-      throw new Error('Missing semicolon');
+      // Continue parsing without semicolon
+    } else {
+      this.advance();
     }
-    this.advance();
     
     return {
       type: 'declaration',
@@ -683,7 +750,11 @@ class Parser {
         position: this.currentToken().position,
         suggestion: 'Add ) after parameters'
       });
-      throw new Error('Missing )');
+      this.synchronize();
+      return {
+        type: 'error',
+        value: 'function_declaration_error'
+      };
     }
     this.advance();
     
@@ -705,7 +776,8 @@ class Parser {
         position: this.currentToken().position,
         suggestion: 'Add { to start block'
       });
-      throw new Error('Expected {');
+      this.synchronize();
+      return { type: 'error', value: 'missing_block' };
     }
     this.advance();
     
@@ -720,9 +792,10 @@ class Parser {
         position: this.currentToken().position,
         suggestion: 'Add } to close block'
       });
-      throw new Error('Missing }');
+      // Continue anyway
+    } else {
+      this.advance();
     }
-    this.advance();
     
     return {
       type: 'block',
@@ -739,7 +812,8 @@ class Parser {
         position: this.currentToken().position,
         suggestion: 'Add ( before condition'
       });
-      throw new Error('Expected (');
+      this.synchronize();
+      return { type: 'error', value: 'if_statement_error' };
     }
     this.advance();
     
@@ -751,9 +825,10 @@ class Parser {
         position: this.currentToken().position,
         suggestion: 'Add ) after if condition'
       });
-      throw new Error('Expected )');
+      // Continue anyway
+    } else {
+      this.advance();
     }
-    this.advance();
     
     const body = this.currentToken().type === 'LBRACE' ? this.block() : this.statement();
     
@@ -780,7 +855,8 @@ class Parser {
         position: this.currentToken().position,
         suggestion: 'Add ( before condition'
       });
-      throw new Error('Expected (');
+      this.synchronize();
+      return { type: 'error', value: 'while_loop_error' };
     }
     this.advance();
     
@@ -792,9 +868,10 @@ class Parser {
         position: this.currentToken().position,
         suggestion: 'Add ) after while condition'
       });
-      throw new Error('Expected )');
+      // Continue anyway
+    } else {
+      this.advance();
     }
-    this.advance();
     
     const body = this.currentToken().type === 'LBRACE' ? this.block() : this.statement();
     
@@ -816,7 +893,8 @@ class Parser {
         position: this.currentToken().position,
         suggestion: "Add 'while (condition)' after do block"
       });
-      throw new Error("Expected 'while'");
+      this.synchronize();
+      return { type: 'error', value: 'do_while_error' };
     }
     this.advance();
     
@@ -826,7 +904,8 @@ class Parser {
         position: this.currentToken().position,
         suggestion: 'Add ( before condition'
       });
-      throw new Error('Expected (');
+      this.synchronize();
+      return { type: 'error', value: 'do_while_error' };
     }
     this.advance();
     
@@ -838,9 +917,10 @@ class Parser {
         position: this.currentToken().position,
         suggestion: 'Add ) after condition'
       });
-      throw new Error('Expected )');
+      // Continue anyway
+    } else {
+      this.advance();
     }
-    this.advance();
     
     if (this.currentToken().type === 'SEMICOLON') {
       this.advance();
@@ -874,9 +954,10 @@ class Parser {
         position: this.currentToken().position,
         suggestion: 'Add ) after expression'
       });
-      throw new Error('Expected )');
+      // Continue anyway
+    } else {
+      this.advance();
     }
-    this.advance();
     
     if (this.currentToken().type !== 'LBRACE') {
       this.errors.push({
@@ -884,7 +965,8 @@ class Parser {
         position: this.currentToken().position,
         suggestion: 'Add { to start switch body'
       });
-      throw new Error('Expected {');
+      this.synchronize();
+      return { type: 'error', value: 'switch_error' };
     }
     this.advance();
     
@@ -944,9 +1026,10 @@ class Parser {
         position: this.currentToken().position,
         suggestion: 'Add } to close switch statement'
       });
-      throw new Error('Expected }');
+      // Continue anyway
+    } else {
+      this.advance();
     }
-    this.advance();
     
     return {
       type: 'switch',
@@ -965,7 +1048,8 @@ class Parser {
         position: this.currentToken().position,
         suggestion: 'Add ( before for clauses'
       });
-      throw new Error('Expected (');
+      this.synchronize();
+      return { type: 'error', value: 'for_loop_error' };
     }
     this.advance();
     
@@ -984,9 +1068,10 @@ class Parser {
         position: this.currentToken().position,
         suggestion: 'Add ) after for loop header'
       });
-      throw new Error('Expected )');
+      // Continue anyway
+    } else {
+      this.advance();
     }
-    this.advance();
     
     const body = this.currentToken().type === 'LBRACE' ? this.block() : this.statement();
     
@@ -1013,9 +1098,10 @@ class Parser {
         position: this.currentToken().position,
         suggestion: 'Add ; after return statement'
       });
-      throw new Error('Missing semicolon');
+      // Continue anyway
+    } else {
+      this.advance();
     }
-    this.advance();
     
     return {
       type: 'return',
@@ -1037,9 +1123,10 @@ class Parser {
           position: this.currentToken().position,
           suggestion: 'Add ] to close array subscript'
         });
-        throw new Error('Missing ]');
+        // Continue anyway
+      } else {
+        this.advance();
       }
-      this.advance();
       
       if (this.currentToken().type === 'ASSIGN' || this.currentToken().type === 'COMPOUND_ASSIGN') {
         const op = this.advance().value;
@@ -1351,9 +1438,10 @@ class Parser {
             position: this.currentToken().position,
             suggestion: 'Add ] to close array subscript'
           });
-          throw new Error('Missing ]');
+          // Continue anyway
+        } else {
+          this.advance();
         }
-        this.advance();
         
         return {
           type: 'array_access',
@@ -1380,9 +1468,10 @@ class Parser {
             position: this.currentToken().position,
             suggestion: 'Add ) to close function call'
           });
-          throw new Error('Missing )');
+          // Continue anyway
+        } else {
+          this.advance();
         }
-        this.advance();
         
         return {
           type: 'function_call',
@@ -1407,7 +1496,8 @@ class Parser {
           position: token.position,
           suggestion: `Add ')' after position ${this.currentToken().position}`
         });
-        throw new Error('Missing closing parenthesis');
+        // Continue anyway - return the expression as is
+        return expr;
       }
       
       this.advance();
@@ -1420,7 +1510,8 @@ class Parser {
         position: token.position,
         suggestion: 'Remove extra ) or add matching ( before it'
       });
-      throw new Error('Unexpected )');
+      this.advance(); // Skip the bad token
+      return { type: 'error', value: 'unexpected_rparen' };
     }
     
     if (token.type === 'OPERATOR') {
@@ -1441,7 +1532,8 @@ class Parser {
         position: token.position,
         suggestion: 'Add a number or expression before the operator'
       });
-      throw new Error('Unexpected operator');
+      this.advance(); // Skip the bad token
+      return { type: 'error', value: 'unexpected_operator' };
     }
     
     this.errors.push({
@@ -1449,7 +1541,8 @@ class Parser {
       position: token.position,
       suggestion: 'Expression must start with a number or ('
     });
-    throw new Error('Unexpected token');
+    this.advance(); // Skip the bad token
+    return { type: 'error', value: 'unexpected_token' };
   }
 }
 
