@@ -37,26 +37,35 @@ const Index = () => {
 
     // Try to execute C program or evaluate arithmetic
     if (parseResult.success && parseResult.tree) {
-      try {
-        // Try executing as C program first
-        const execResult = executeProgram(parseResult.tree);
-        
-        if (execResult.error) {
-          setEvaluationData({ result: null, error: execResult.error, programOutput: execResult });
-          toast.error("Execution error: " + execResult.error);
-        } else {
-          setEvaluationData({ result: execResult.returnValue || 0, programOutput: execResult });
-          toast.success("Program executed successfully!");
+      // Check if it's a C program (has function declarations or statements array)
+      const isCProgram = parseResult.tree.type === 'program' || 
+                        parseResult.tree.type === 'function_declaration';
+      
+      if (isCProgram) {
+        // Execute as C program
+        try {
+          const execResult = executeProgram(parseResult.tree);
+          
+          if (execResult.error) {
+            setEvaluationData({ result: null, error: execResult.error, programOutput: execResult });
+            toast.error("Execution error: " + execResult.error);
+          } else {
+            setEvaluationData({ result: execResult.returnValue !== null ? execResult.returnValue : 0, programOutput: execResult });
+            toast.success("Program executed successfully!");
+          }
+        } catch (error) {
+          setEvaluationData({ result: null, error: error instanceof Error ? error.message : "Execution failed" });
+          toast.error("Execution failed");
         }
-      } catch (error) {
-        // If execution fails, try arithmetic evaluation
+      } else {
+        // Execute as arithmetic expression
         try {
           const evalResult = evaluateAST(parseResult.tree);
           setEvaluationData({ result: evalResult });
-          toast.success("Expression parsed and evaluated successfully!");
+          toast.success("Expression evaluated successfully!");
         } catch (evalError) {
           setEvaluationData({ result: null, error: evalError instanceof Error ? evalError.message : "Evaluation failed" });
-          toast.success("Expression parsed successfully!");
+          toast.error("Evaluation failed");
         }
       }
     } else {
