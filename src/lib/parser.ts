@@ -55,7 +55,9 @@ export type TokenType =
   | 'PREPROCESSOR'
   | 'DOT'
   | 'ARROW'
-  | 'AMPERSAND';
+  | 'AMPERSAND'
+  | 'COLON'
+  | 'QUESTION';
 
 export interface Token {
   type: TokenType;
@@ -342,6 +344,16 @@ export class Lexer {
       }
       if (char === '.') {
         tokens.push({ type: 'DOT', value: char, position: this.position });
+        this.position++;
+        continue;
+      }
+      if (char === ':') {
+        tokens.push({ type: 'COLON', value: char, position: this.position });
+        this.position++;
+        continue;
+      }
+      if (char === '?') {
+        tokens.push({ type: 'QUESTION', value: char, position: this.position });
         this.position++;
         continue;
       }
@@ -1235,7 +1247,38 @@ class Parser {
   }
 
   private expression(): ASTNode {
-    return this.logicalOr();
+    return this.ternary();
+  }
+
+  // Ternary operator (? :)
+  private ternary(): ASTNode {
+    let expr = this.logicalOr();
+    
+    if (this.currentToken().type === 'QUESTION') {
+      this.advance();
+      const trueExpr = this.expression();
+      
+      if (this.currentToken().type !== 'COLON') {
+        this.errors.push({
+          message: 'Expected : in ternary operator',
+          position: this.currentToken().position,
+          suggestion: 'Add : before false expression'
+        });
+        return expr;
+      }
+      this.advance();
+      
+      const falseExpr = this.ternary();
+      
+      return {
+        type: 'ternary',
+        condition: expr,
+        left: trueExpr,
+        right: falseExpr
+      };
+    }
+    
+    return expr;
   }
 
   // Logical OR (||)
@@ -1781,6 +1824,11 @@ export function evaluateAST(node: ASTNode): number {
     throw new Error(`Cannot evaluate identifier '${node.value}' without variable context`);
   }
   
+  if (node.type === 'ternary') {
+    const condition = evaluateAST(node.condition!);
+    return condition ? evaluateAST(node.left!) : evaluateAST(node.right!);
+  }
+  
   if (node.type === 'binary_op' && node.left && node.right) {
     const left = evaluateAST(node.left);
     const right = evaluateAST(node.right);
@@ -1995,6 +2043,12 @@ class Interpreter {
       
       case 'binary_op':
         return this.evaluateBinaryOp(node);
+      
+      case 'ternary':
+        const ternaryCondition = this.interpretNode(node.condition!);
+        return this.isTruthy(ternaryCondition) 
+          ? this.interpretNode(node.left!) 
+          : this.interpretNode(node.right!);
       
       case 'unary_op':
         const operand = this.interpretNode(node.right!);
