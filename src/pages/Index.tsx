@@ -9,7 +9,6 @@ import { GrammarRules } from "@/components/GrammarRules";
 import { TreeVisualization } from "@/components/TreeVisualization";
 import { EvaluationResult } from "@/components/EvaluationResult";
 import { ExportResults } from "@/components/ExportResults";
-import { ProgramOutput } from "@/components/ProgramOutput";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -20,9 +19,7 @@ const Index = () => {
   const [expression, setExpression] = useState("");
   const [result, setResult] = useState<ParseResult | null>(null);
   const [tokens, setTokens] = useState<Token[]>([]);
-  const [evaluation, setEvaluation] = useState<number | null>(null);
-  const [evalError, setEvalError] = useState<string>("");
-  const [programOutput, setProgramOutput] = useState<ExecutionResult | null>(null);
+  const [evaluationData, setEvaluationData] = useState<{ result: number | null; error?: string; programOutput?: ExecutionResult } | null>(null);
 
   const handleParse = () => {
     if (!expression.trim()) {
@@ -43,34 +40,27 @@ const Index = () => {
       try {
         // Try executing as C program first
         const execResult = executeProgram(parseResult.tree);
-        setProgramOutput(execResult);
-        setEvaluation(null);
-        setEvalError("");
         
         if (execResult.error) {
+          setEvaluationData({ result: null, error: execResult.error, programOutput: execResult });
           toast.error("Execution error: " + execResult.error);
         } else {
+          setEvaluationData({ result: execResult.returnValue || 0, programOutput: execResult });
           toast.success("Program executed successfully!");
         }
       } catch (error) {
         // If execution fails, try arithmetic evaluation
         try {
           const evalResult = evaluateAST(parseResult.tree);
-          setEvaluation(evalResult);
-          setProgramOutput(null);
-          setEvalError("");
+          setEvaluationData({ result: evalResult });
           toast.success("Expression parsed and evaluated successfully!");
         } catch (evalError) {
-          setEvaluation(null);
-          setProgramOutput(null);
-          setEvalError(evalError instanceof Error ? evalError.message : "Evaluation failed");
+          setEvaluationData({ result: null, error: evalError instanceof Error ? evalError.message : "Evaluation failed" });
           toast.success("Expression parsed successfully!");
         }
       }
     } else {
-      setEvaluation(null);
-      setProgramOutput(null);
-      setEvalError("");
+      setEvaluationData(null);
       toast.error("Syntax error detected");
     }
   };
@@ -79,18 +69,14 @@ const Index = () => {
     setExpression("");
     setResult(null);
     setTokens([]);
-    setEvaluation(null);
-    setEvalError("");
-    setProgramOutput(null);
+    setEvaluationData(null);
   };
 
   const handleExampleSelect = (example: string) => {
     setExpression(example);
     setResult(null);
     setTokens([]);
-    setEvaluation(null);
-    setEvalError("");
-    setProgramOutput(null);
+    setEvaluationData(null);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -148,7 +134,7 @@ const Index = () => {
                     expression={expression}
                     result={result}
                     tokens={tokens}
-                    evaluation={evaluation}
+                    evaluation={evaluationData?.result || null}
                   />
                 )}
               </div>
@@ -179,11 +165,10 @@ const Index = () => {
 
           {result && (
             <Tabs defaultValue="output" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="output">Parse Output</TabsTrigger>
                 <TabsTrigger value="tree" disabled={!result.success}>Visual Tree</TabsTrigger>
-                <TabsTrigger value="execution" disabled={!programOutput}>Execution</TabsTrigger>
-                <TabsTrigger value="eval" disabled={evaluation === null}>Evaluation</TabsTrigger>
+                <TabsTrigger value="eval" disabled={!evaluationData}>Evaluation</TabsTrigger>
               </TabsList>
               
               <TabsContent value="output" className="mt-6">
@@ -194,12 +179,8 @@ const Index = () => {
                 {result.tree && <TreeVisualization tree={result.tree} />}
               </TabsContent>
               
-              <TabsContent value="execution" className="mt-6">
-                {programOutput && <ProgramOutput result={programOutput} />}
-              </TabsContent>
-              
               <TabsContent value="eval" className="mt-6">
-                <EvaluationResult result={evaluation} error={evalError} />
+                {evaluationData && <EvaluationResult evaluationData={evaluationData} />}
               </TabsContent>
             </Tabs>
           )}
