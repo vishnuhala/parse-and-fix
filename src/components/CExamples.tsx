@@ -112,11 +112,6 @@ export const CExamples = ({ onSelectExample }: CExamplesProps) => {
       error: "Invalid operator $ used"
     },
     {
-      title: "Missing Return Type",
-      code: "add(int a, int b) {\n  return a + b;\n}",
-      error: "Function missing return type"
-    },
-    {
       title: "Unclosed String",
       code: "char str[] = \"Hello;",
       error: "String literal not closed"
@@ -125,11 +120,6 @@ export const CExamples = ({ onSelectExample }: CExamplesProps) => {
       title: "Missing Array Size",
       code: "int arr[];",
       error: "Array declared without size"
-    },
-    {
-      title: "Invalid Break",
-      code: "int main() {\n  break;\n  return 0;\n}",
-      error: "Break outside loop or switch"
     }
   ];
 
