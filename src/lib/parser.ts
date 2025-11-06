@@ -577,9 +577,7 @@ class Parser {
       }
       
       // Assignment or expression statement
-      if (token.type === 'IDENTIFIER') {
-        return this.assignmentOrExpression();
-      }
+      return this.expressionStatement();
       
       this.errors.push({
         message: `Unexpected token '${token.value}'`,
@@ -1072,7 +1070,7 @@ class Parser {
       this.advance();
     }
     
-    const increment = this.currentToken().type === 'RPAREN' ? undefined : this.assignmentOrExpression();
+    const increment = this.currentToken().type === 'RPAREN' ? undefined : this.expression();
     
     if (this.currentToken().type !== 'RPAREN') {
       this.errors.push({
@@ -1119,6 +1117,18 @@ class Parser {
       type: 'return',
       value
     };
+  }
+
+  private expressionStatement(): ASTNode {
+    if (this.currentToken().type === 'SEMICOLON') {
+      this.advance();
+      return { type: 'empty' } as any;
+    }
+    const expr = this.expression();
+    if (this.currentToken().type === 'SEMICOLON') {
+      this.advance();
+    }
+    return expr;
   }
 
   private assignmentOrExpression(): ASTNode {
@@ -1247,7 +1257,25 @@ class Parser {
   }
 
   private expression(): ASTNode {
-    return this.ternary();
+    return this.assignment();
+  }
+
+  // Assignment expression (right-associative)
+  private assignment(): ASTNode {
+    const left = this.ternary();
+
+    if (this.currentToken().type === 'ASSIGN' || this.currentToken().type === 'COMPOUND_ASSIGN') {
+      const operator = this.advance().value; // '=' or '+=', etc.
+      const right = this.assignment();
+      return {
+        type: 'assignment',
+        operator,
+        left,
+        right
+      };
+    }
+
+    return left;
   }
 
   // Ternary operator (? :)
