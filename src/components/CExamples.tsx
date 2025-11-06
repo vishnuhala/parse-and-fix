@@ -39,11 +39,6 @@ export const CExamples = ({ onSelectExample }: CExamplesProps) => {
       description: "Switch-case for grade evaluation"
     },
     {
-      title: "Do-While Loop",
-      code: "int main() {\n  int i = 0;\n  do {\n    i++;\n  } while (i < 5);\n  return 0;\n}",
-      description: "Do-while loop example"
-    },
-    {
       title: "Fibonacci Sequence",
       code: "int fibonacci(int n) {\n  if (n <= 1) {\n    return n;\n  }\n  return fibonacci(n - 1) + fibonacci(n - 2);\n}",
       description: "Recursive Fibonacci calculation"
@@ -115,11 +110,6 @@ export const CExamples = ({ onSelectExample }: CExamplesProps) => {
       title: "Unclosed String",
       code: "char str[] = \"Hello;",
       error: "String literal not closed"
-    },
-    {
-      title: "Missing Array Size",
-      code: "int arr[];",
-      error: "Array declared without size"
     }
   ];
 
