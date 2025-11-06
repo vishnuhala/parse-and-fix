@@ -1381,7 +1381,7 @@ class Parser {
   }
 
   private power(): ASTNode {
-    let left = this.primary();
+    let left = this.unary();
     
     if (this.currentToken().type === 'OPERATOR' && 
         this.currentToken().value === '^') {
@@ -1396,6 +1396,50 @@ class Parser {
     }
     
     return left;
+  }
+
+  private unary(): ASTNode {
+    const token = this.currentToken();
+    
+    // Unary minus/plus
+    if (token.type === 'OPERATOR' && (token.value === '-' || token.value === '+')) {
+      this.advance();
+      return {
+        type: 'unary_op',
+        operator: token.value,
+        right: this.unary()
+      };
+    }
+    
+    // Pointer dereference
+    if (token.type === 'OPERATOR' && token.value === '*') {
+      this.advance();
+      return {
+        type: 'dereference',
+        right: this.unary()
+      };
+    }
+    
+    // Address-of operator
+    if (token.type === 'AMPERSAND') {
+      this.advance();
+      return {
+        type: 'address_of',
+        right: this.unary()
+      };
+    }
+    
+    // Logical NOT
+    if (token.type === 'LOGICAL' && token.value === '!') {
+      this.advance();
+      return {
+        type: 'unary_op',
+        operator: '!',
+        right: this.unary()
+      };
+    }
+    
+    return this.primary();
   }
 
   private primary(): ASTNode {
@@ -1438,34 +1482,6 @@ class Parser {
       }
     }
 
-    // Logical NOT
-    if (token.type === 'LOGICAL' && token.value === '!') {
-      this.advance();
-      return {
-        type: 'binary_op',
-        operator: '!',
-        left: { type: 'number', value: 0 },
-        right: this.primary()
-      };
-    }
-
-    // Address-of operator
-    if (token.type === 'AMPERSAND') {
-      this.advance();
-      return {
-        type: 'address_of',
-        right: this.primary()
-      };
-    }
-
-    // Dereference operator
-    if (token.type === 'OPERATOR' && token.value === '*') {
-      this.advance();
-      return {
-        type: 'dereference',
-        right: this.primary()
-      };
-    }
 
     if (token.type === 'IDENTIFIER') {
       const id = this.advance().value;
